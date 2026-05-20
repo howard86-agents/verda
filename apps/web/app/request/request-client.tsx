@@ -344,9 +344,7 @@ function ReviewStep({ form }: { form: FormState }) {
           <div className="row flex-wrap gap-[14px]">
             <span>
               Concierge channel · LINE
-              <span className="muted ml-[6px] font-mono">
-                @verda_concierge
-              </span>
+              <span className="muted ml-[6px] font-mono">@verda_concierge</span>
             </span>
             <span className="tag border-positive text-positive">
               <span className="dot bg-positive" /> connected
