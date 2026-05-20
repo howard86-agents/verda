@@ -1,22 +1,24 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Geist, JetBrains_Mono } from "next/font/google";
-import { DevSwitcher } from "./_components/dev-switcher";
-import { Footer } from "./_components/footer";
-import { Header } from "./_components/header";
+import {
+  Inter,
+  JetBrains_Mono,
+  Noto_Sans_JP,
+  Noto_Serif_JP,
+  Shippori_Mincho,
+} from "next/font/google";
 import { Providers } from "./providers";
 
-const cormorant = Cormorant_Garamond({
+const shippori = Shippori_Mincho({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  style: ["normal", "italic"],
+  weight: ["400", "500", "700"],
   variable: "--ff-display",
   display: "swap",
 });
 
-const geist = Geist({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "500", "600"],
   variable: "--ff-sans",
   display: "swap",
 });
@@ -28,18 +30,31 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
+// Japanese faces — large; don't preload, used only for CJK glyph coverage.
+const notoSansJp = Noto_Sans_JP({
+  weight: ["400", "500"],
+  variable: "--ff-jp-sans",
+  display: "swap",
+  preload: false,
+});
+
+const notoSerifJp = Noto_Serif_JP({
+  weight: ["400", "500", "700"],
+  variable: "--ff-jp-serif",
+  display: "swap",
+  preload: false,
+});
+
 export const metadata: Metadata = {
-  title: "VERDA · Concierge",
+  title: "Verda · Story Center · 故事中心",
   description:
-    "A private concierge for sourcing fine leather, watchmaking and ready-to-wear.",
+    "A multimedia story center — brand stories, reader submissions, and a growable garden of nutrient points.",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
 };
-
-const isDev = process.env.NODE_ENV !== "production";
 
 export default function RootLayout({
   children,
@@ -48,7 +63,7 @@ export default function RootLayout({
 }) {
   return (
     <html
-      className={`${cormorant.variable} ${geist.variable} ${mono.variable}`}
+      className={`${shippori.variable} ${inter.variable} ${mono.variable} ${notoSansJp.variable} ${notoSerifJp.variable}`}
       lang="en"
       suppressHydrationWarning
     >
@@ -56,14 +71,7 @@ export default function RootLayout({
         <script src="/theme-init.js" />
       </head>
       <body>
-        <Providers>
-          <div className="flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-            {isDev && <DevSwitcher />}
-          </div>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
