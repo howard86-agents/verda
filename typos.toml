@@ -1,0 +1,18 @@
+# typos config — https://github.com/crate-ci/typos
+# Flags only known misspellings (typos→typos, recieve→receive). Domain
+# vocabulary that looks like a typo gets allowlisted here.
+
+[default.extend-words]
+# IATA / airport codes used as city identifiers in member records
+TPE = "TPE"
+
+[files]
+extend-exclude = [
+  "bun.lock",
+  "*.svg",
+  "**/staging/**",
+  "**/generated/**",
+  "**/.next/**",
+  "**/dist/**",
+  "**/node_modules/**",
+]

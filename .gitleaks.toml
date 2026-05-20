@@ -1,0 +1,21 @@
+# gitleaks config — https://github.com/gitleaks/gitleaks
+# Extends the built-in ruleset; this file scopes allowlists to known
+# non-secret fixture values that would otherwise look like credentials.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Example/fixture values in .env.example are documentation, not secrets"
+paths = [
+  '''(^|/)\.env\.example$''',
+]
+
+[[allowlists]]
+description = "Generated Prisma client output is regenerable artifact, not source"
+paths = [
+  '''(^|/)generated/''',
+  '''(^|/)\.next/''',
+  '''(^|/)dist/''',
+  '''(^|/)staging/''',
+]

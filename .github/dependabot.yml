@@ -1,0 +1,44 @@
+version: 2
+
+# Bun lockfile support in Dependabot is recent and may not handle bun.lock
+# (text format) — if updates land but `bun install --frozen-lockfile` then
+# fails in CI, switch `package-ecosystem` to `npm` and run `bun install`
+# locally before merging Dependabot PRs.
+updates:
+  - package-ecosystem: bun
+    directories:
+      - /
+      - /apps/web
+      - /apps/cli
+      - /packages/data
+      - /packages/database
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+      prod-dependencies:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      # Pin majors for framework anchors — only minor/patch via the groups above.
+      - dependency-name: react
+        update-types: [version-update:semver-major]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major]
+      - dependency-name: next
+        update-types: [version-update:semver-major]
+      - dependency-name: prisma
+        update-types: [version-update:semver-major]
+      - dependency-name: "@prisma/*"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
