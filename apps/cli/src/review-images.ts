@@ -2,16 +2,16 @@
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { AI_MATCHES, PRODUCTS, REFERENCE_IMAGE } from "@verda/data";
+import { type ImageKind, SOCIAL, STORIES } from "@verda/data";
 import sharp from "sharp";
 
 const STYLE_SUFFIX =
-  "editorial product photography, soft directional daylight, " +
-  "ivory paper backdrop, neutral natural palette, 35mm film grain, " +
-  "shallow depth of field, centred composition, no text, no logo, no watermark";
+  "editorial lifestyle photography, soft natural daylight, warm muted earthy " +
+  "palette, 35mm film grain, gentle shallow depth of field, calm minimal " +
+  "composition, no text, no logo, no watermark";
 
-const WIDTH = 1024;
-const HEIGHT = 1280;
+const WIDTH = 1280;
+const HEIGHT = 854;
 const QUALITY = 82;
 
 const REPO_ROOT = resolve(import.meta.dir, "../../..");
@@ -21,11 +21,9 @@ const ARCHIVE_DIR = resolve(STAGING_DIR, ".archive");
 const VERDICT_PATH = resolve(STAGING_DIR, ".verdicts.json");
 const SCHEMA_PATH = resolve(import.meta.dir, "verdict.schema.json");
 
-type Kind = "products" | "matches" | "reference";
-
 interface Job {
   id: string;
-  kind: Kind;
+  kind: ImageKind;
   prompt: string;
 }
 
@@ -62,30 +60,21 @@ interface ParsedArgs {
 
 function loadJobs(): Job[] {
   const jobs: Job[] = [];
-  for (const p of PRODUCTS) {
-    jobs.push({ kind: "products", id: p.id, prompt: p.imagePrompt });
+  for (const s of STORIES) {
+    jobs.push({ kind: "stories", id: s.id, prompt: s.imagePrompt });
   }
-  for (const m of AI_MATCHES) {
-    jobs.push({ kind: "matches", id: m.id, prompt: m.imagePrompt });
+  for (const r of SOCIAL) {
+    jobs.push({ kind: "social", id: r.id, prompt: r.imagePrompt });
   }
-  jobs.push({
-    kind: "reference",
-    id: REFERENCE_IMAGE.id,
-    prompt: REFERENCE_IMAGE.imagePrompt,
-  });
   return jobs;
 }
 
 function publicPath(job: Job): string {
-  return job.kind === "reference"
-    ? resolve(PUBLIC_DIR, "reference.webp")
-    : resolve(PUBLIC_DIR, job.kind, `${job.id}.webp`);
+  return resolve(PUBLIC_DIR, job.kind, `${job.id}.webp`);
 }
 
 function stagingPath(job: Job): string {
-  return job.kind === "reference"
-    ? resolve(STAGING_DIR, "reference.webp")
-    : resolve(STAGING_DIR, job.kind, `${job.id}.webp`);
+  return resolve(STAGING_DIR, job.kind, `${job.id}.webp`);
 }
 
 function cacheKey(job: Job): string {
@@ -172,7 +161,7 @@ async function runCodex(args: string[], prompt: string): Promise<string> {
 
 async function codexGenerate(job: Job): Promise<string> {
   const prompt = [
-    `Use your image generation tool to produce a portrait product photograph at roughly ${WIDTH}x${HEIGHT} (4:5).`,
+    `Use your image generation tool to produce a landscape lifestyle photograph at roughly ${WIDTH}x${HEIGHT} (3:2).`,
     `Subject: ${job.prompt}.`,
     `Required style: ${STYLE_SUFFIX}.`,
     "After the image is generated, your final reply must be ONLY the absolute file path of the saved PNG file. No prose, no markdown, no quotes.",
