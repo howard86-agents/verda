@@ -1,323 +1,253 @@
-export interface Product {
-  ccy: "USD";
-  condition?: string;
-  house: string;
-  id: string;
-  imagePrompt: string;
-  imageSeed: number;
-  name: string;
-  price: number;
-  stockType: "in-vault" | "estimated";
-  tag?: string;
-}
+// Verda · Tokyo Press — Multimedia Story Center sample data.
+// Static design data; no backend wiring in this pass.
 
-export const PRODUCTS: Product[] = [
-  {
-    id: "p1",
-    house: "BIRKETT",
-    name: "Saddle 25 in Étoupe",
-    price: 12_400,
-    ccy: "USD",
-    stockType: "estimated",
-    condition: "New",
-    tag: "Concierge sourced",
-    imagePrompt:
-      "structured saddle-style handbag in pale taupe pebbled calfskin with rolled top handle and brushed palladium hardware, displayed upright",
-    imageSeed: 101,
-  },
-  {
-    id: "p2",
-    house: "AUREL",
-    name: "Linked-Chain Tote",
-    price: 4200,
-    ccy: "USD",
-    stockType: "in-vault",
-    condition: "New",
-    tag: "In vault · Taipei",
-    imagePrompt:
-      "soft unstructured black smooth leather tote with polished gold linked-chain handles draped over the shoulder of the bag",
-    imageSeed: 102,
-  },
-  {
-    id: "p3",
-    house: "COURONNE",
-    name: "Skeleton Tourbillon 41",
-    price: 86_500,
-    ccy: "USD",
-    stockType: "estimated",
-    condition: "Unworn",
-    tag: "Waitlist · 6w",
-    imagePrompt:
-      "skeleton tourbillon wristwatch with rose gold 41mm case and brown alligator strap, exposed mechanical movement visible through the open dial",
-    imageSeed: 103,
-  },
-  {
-    id: "p4",
-    house: "LUMIÈRE",
-    name: "Riviera Knotted Mules",
-    price: 1180,
-    ccy: "USD",
-    stockType: "in-vault",
-    condition: "New",
-    tag: "Last pair",
-    imagePrompt:
-      "pair of ivory nappa leather knotted mules with low block heel, slight 3/4 angle showing the knot detail",
-    imageSeed: 104,
-  },
-  {
-    id: "p5",
-    house: "ORSAY",
-    name: "Crocodile Wallet, Noir",
-    price: 3650,
-    ccy: "USD",
-    stockType: "in-vault",
-    condition: "New",
-    imagePrompt:
-      "compact closed bifold wallet in glossy black crocodile-textured leather, viewed from above, slight three-quarter perspective",
-    imageSeed: 105,
-  },
-  {
-    id: "p6",
-    house: "NORD",
-    name: "Cashmere Maxi Coat",
-    price: 5400,
-    ccy: "USD",
-    stockType: "estimated",
-    imagePrompt:
-      "oversized camel cashmere maxi coat draped over a pale oak studio chair, soft folds catching the light",
-    imageSeed: 106,
-  },
-  {
-    id: "p7",
-    house: "AUREL",
-    name: "Mini Camera Bag · Gold",
-    price: 3950,
-    ccy: "USD",
-    stockType: "in-vault",
-    tag: "New season",
-    imagePrompt:
-      "small structured boxy crossbody camera bag in soft champagne gold metallic leather with slim adjustable strap",
-    imageSeed: 107,
-  },
-  {
-    id: "p8",
-    house: "COURONNE",
-    name: "Pavé Diamond Hour Markers",
-    price: 24_800,
-    ccy: "USD",
-    stockType: "estimated",
-    tag: "Quote on request",
-    imagePrompt:
-      "close-up macro of a luxury watch dial with pavé-set diamond hour markers around a brushed silver sunray finish",
-    imageSeed: 108,
-  },
-];
+export type StoryKind = "brand";
 
-export const HOUSES = [
-  "BIRKETT",
-  "AUREL",
-  "COURONNE",
-  "ORSAY",
-  "LUMIÈRE",
-  "NORD",
-  "VAILLANT",
-  "PARC",
-];
+/** Cover-image categories — the public/img/<kind>/ folders the CLI writes. */
+export type ImageKind = "stories" | "social";
 
-export type OrderState = "paid" | "sourcing" | "quote" | "delivered";
-
-export interface OrderRow {
+export interface Story {
+  author: string;
+  cat: string;
   date: string;
   id: string;
-  item: string;
-  state: OrderState;
-  value: string;
+  /** Prompt for the apps/cli cover generator. */
+  imagePrompt: string;
+  imageSeed: number;
+  /** CSS gradient used as the cover backdrop / fallback. */
+  img: string;
+  jp: string;
+  kind: StoryKind;
+  /** Reading time in minutes. */
+  read: number;
+  slug: string;
+  sum: string;
+  tag: string;
+  title: string;
 }
 
-export const ORDERS: OrderRow[] = [
+export const STORIES: Story[] = [
   {
-    id: "MSN-04821",
-    date: "2026·05·08",
-    item: "Saddle 25 in Étoupe",
-    value: "NT$ 392,400",
-    state: "sourcing",
+    id: "s01",
+    slug: "quiet-rituals-slower-morning",
+    cat: "Mindful Living",
+    tag: "morning",
+    title: "The quiet rituals that shape a slower morning",
+    jp: "静かな朝の儀式",
+    sum: "On choosing one small thing — and letting it stay small.",
+    img: "linear-gradient(135deg, #d6d3c8, #4a4a45)",
+    imagePrompt:
+      "a quiet sunlit breakfast nook at dawn, a single ceramic cup of tea on a worn wooden table, soft folded linen, calm minimal still life",
+    imageSeed: 401,
+    read: 6,
+    date: "May 18",
+    author: "Lin K.",
+    kind: "brand",
   },
   {
-    id: "MSN-04687",
-    date: "2026·04·22",
-    item: "Riviera Knotted Mules",
-    value: "NT$  37,460",
-    state: "delivered",
+    id: "s02",
+    slug: "spring-bowl-five-colors",
+    cat: "Nutrition",
+    tag: "recipe",
+    title: "A spring bowl, in five colors",
+    jp: "春の五色丼",
+    sum: "How a handful of soaked grains became a habit.",
+    img: "linear-gradient(135deg, #f0e1c3, #c2603a)",
+    imagePrompt:
+      "an overhead flat lay of a colorful grain bowl with vegetables in five colors, rustic ceramic bowl, soft daylight",
+    imageSeed: 402,
+    read: 4,
+    date: "May 16",
+    author: "Sora M.",
+    kind: "brand",
   },
   {
-    id: "MSN-04514",
-    date: "2026·04·05",
-    item: "Custom — Vintage Tank Watch",
-    value: "NT$  68,000",
-    state: "paid",
+    id: "s03",
+    slug: "reading-the-soil",
+    cat: "Earth & Garden",
+    tag: "season",
+    title: "Reading the soil — what your basil is telling you",
+    jp: "土を読む",
+    sum: "Curling, yellow tips, and the patience of clay.",
+    img: "linear-gradient(135deg, #d7c8a0, #5a5a3a)",
+    imagePrompt:
+      "close-up of a potted basil plant in a terracotta pot on a windowsill, rich dark soil, soft natural light",
+    imageSeed: 403,
+    read: 8,
+    date: "May 14",
+    author: "A. Chen",
+    kind: "brand",
   },
   {
-    id: "MSN-04503",
-    date: "2026·04·02",
-    item: "Custom — Aurel Sequin Clutch",
-    value: "pending quote",
-    state: "quote",
+    id: "s04",
+    slug: "a-walk-after-dinner",
+    cat: "Movement",
+    tag: "practice",
+    title: "A walk, after dinner, in any weather",
+    jp: "夕食後の一歩",
+    sum: "The smallest practice that survived the year.",
+    img: "linear-gradient(135deg, #e5cdbf, #c8261d)",
+    imagePrompt:
+      "a tree-lined path at dusk after rain, soft golden streetlight, a lone figure walking away, calm atmospheric mood",
+    imageSeed: 404,
+    read: 3,
+    date: "May 12",
+    author: "J. Park",
+    kind: "brand",
+  },
+  {
+    id: "s05",
+    slug: "paper-journal-week-19",
+    cat: "Mindful Living",
+    tag: "journal",
+    title: "Notes from a paper journal, week 19",
+    jp: "手帳の余白",
+    sum: "What I kept, what I crossed out, what I felt at 6am.",
+    img: "linear-gradient(135deg, #d8d8d0, #6a6a62)",
+    imagePrompt:
+      "an open handwritten paper journal with a fountain pen resting on a wooden desk, soft morning light, intimate still life",
+    imageSeed: 405,
+    read: 5,
+    date: "May 10",
+    author: "Lin K.",
+    kind: "brand",
+  },
+  {
+    id: "s06",
+    slug: "six-pantry-items",
+    cat: "Nutrition",
+    tag: "pantry",
+    title: "Six pantry items I now refuse to be without",
+    jp: "六つの常備品",
+    sum: "On building flavor without buying more.",
+    img: "linear-gradient(135deg, #e6d3b8, #8a6c40)",
+    imagePrompt:
+      "a tidy pantry shelf of glass jars filled with grains and spices, warm kitchen light, editorial food still life",
+    imageSeed: 406,
+    read: 6,
+    date: "May 08",
+    author: "Sora M.",
+    kind: "brand",
   },
 ];
 
-export type Tier = "Normal" | "Professional" | "Diamond";
-export const TIERS: Tier[] = ["Normal", "Professional", "Diamond"];
+export type SocialKind = "submission" | "repost" | "remix";
 
+export interface Social {
+  date: string;
+  id: string;
+  imagePrompt: string;
+  imageSeed: number;
+  img: string;
+  kind: SocialKind;
+  slug: string;
+  src: string;
+  tag: string;
+  title: string;
+}
+
+export const SOCIAL: Social[] = [
+  {
+    id: "r01",
+    slug: "turmeric-porridge",
+    kind: "submission",
+    src: "@maya.cooks",
+    title: "Reader recipe: turmeric porridge, my mother's way",
+    tag: "reader",
+    img: "linear-gradient(135deg, #f3d6a8, #c87a3a)",
+    imagePrompt:
+      "a warm bowl of golden turmeric porridge topped with seeds and herbs, cozy home kitchen, soft light",
+    imageSeed: 501,
+    date: "2d",
+  },
+  {
+    id: "r02",
+    slug: "pop-up-garden",
+    kind: "repost",
+    src: "Instagram · @leaf",
+    title: "A pop-up garden in the city, behind a stationery shop",
+    tag: "spotted",
+    img: "linear-gradient(135deg, #c8d8c4, #4a6b48)",
+    imagePrompt:
+      "a small lush pop-up garden behind a stationery shop in the city, potted green plants, charming urban corner",
+    imageSeed: 502,
+    date: "3d",
+  },
+  {
+    id: "r03",
+    slug: "field-notes-remix",
+    kind: "remix",
+    src: "Verda × @studioh",
+    title: "Field notes — a remix of three reader essays",
+    tag: "remix",
+    img: "linear-gradient(135deg, #e9c4d0, #9a4a68)",
+    imagePrompt:
+      "a collage of handwritten field notes and pressed leaves on textured paper, soft daylight, editorial flat lay",
+    imageSeed: 503,
+    date: "5d",
+  },
+];
+
+export const CATEGORIES = [
+  "All",
+  "Mindful Living",
+  "Nutrition",
+  "Movement",
+  "Earth & Garden",
+  "Recipes",
+];
+
+export const COLLECTED = ["s01", "s03", "s05"];
+
+export interface GrowthLevel {
+  current?: boolean;
+  done: boolean;
+  jp: string;
+  n: number;
+  name: string;
+  threshold: number;
+}
+
+export const GROWTH_LEVELS: GrowthLevel[] = [
+  { n: 1, name: "Seed", jp: "種", threshold: 0, done: true },
+  { n: 2, name: "Sprout", jp: "芽", threshold: 50, done: true, current: true },
+  { n: 3, name: "Bloom", jp: "花", threshold: 150, done: false },
+  { n: 4, name: "Fully grown", jp: "結実", threshold: 300, done: false },
+];
+
+export interface LedgerEntry {
+  amt: string;
+  when: string;
+  why: string;
+}
+
+export const LEDGER: LedgerEntry[] = [
+  { amt: "+10", why: "Read · Letters to a slower year", when: "today · 14:08" },
+  { amt: "+5", why: "Daily check-in", when: "today · 09:02" },
+  { amt: "+2", why: "Saved · Reading the soil", when: "yesterday" },
+  { amt: "+10", why: "Read · A spring bowl in 5 colors", when: "May 16" },
+  { amt: "+5", why: "Daily check-in", when: "May 16" },
+];
+
+/** Current growth state, shared by the Home teaser, Grow page and Collection. */
+export const GROWTH = {
+  level: 2,
+  nutrients: 87,
+  nextThreshold: 150,
+  nextName: "Bloom",
+};
+
+/** The logged-in member (Collection profile + CMS member admin sample). */
 export const MEMBER = {
-  firstName: "Mei-Lin",
-  fullName: "Chen Mei-Lin",
-  kanji: "陳美琳",
-  city: "TPE",
-  joined: "March 2022",
-  ledgerYtd: "NT$ 1,840,000",
-  filesCompleted: 14,
-  lineChannel: "@verda_concierge",
-  lineMedianReply: "32 min",
+  initial: "M",
+  name: "Mira Tanaka",
+  jp: "田中ミラ",
+  memberId: "m_4421",
+  joined: "Joined March 2024",
+  email: "mira.t@example.com",
+  level: 2,
+  nutrients: 87,
+  read: 14,
+  saved: 3,
+  redeemed: 0,
 };
-
-export interface AiMatch {
-  brand: string;
-  confidence: number;
-  id: string;
-  imagePrompt: string;
-  imageSeed: number;
-  name: string;
-}
-
-export const AI_MATCHES: AiMatch[] = [
-  {
-    id: "m1",
-    name: "Saddle 25 · Étoupe",
-    brand: "BIRKETT · 2023",
-    confidence: 94,
-    imagePrompt:
-      "structured saddle-style handbag in pale taupe pebbled calfskin, three-quarter view, palladium hardware",
-    imageSeed: 201,
-  },
-  {
-    id: "m2",
-    name: "Saddle 25 · Gris Asphalte",
-    brand: "BIRKETT · 2022",
-    confidence: 71,
-    imagePrompt:
-      "structured saddle-style handbag in deep asphalt grey pebbled calfskin, three-quarter view, palladium hardware",
-    imageSeed: 202,
-  },
-  {
-    id: "m3",
-    name: "Saddle 30 · Étoupe",
-    brand: "BIRKETT · 2024",
-    confidence: 52,
-    imagePrompt:
-      "larger structured saddle-style handbag in pale taupe pebbled calfskin with longer body and palladium hardware",
-    imageSeed: 203,
-  },
-];
-
-export interface ReferenceImage {
-  id: string;
-  imagePrompt: string;
-  imageSeed: number;
-}
-
-export const REFERENCE_IMAGE: ReferenceImage = {
-  id: "reference",
-  imagePrompt:
-    "amateur smartphone photograph of a taupe leather saddle handbag resting on a beige linen sofa, slightly off-centre, soft window light, casual snapshot feel",
-  imageSeed: 301,
-};
-
-export interface QuoteCandidate {
-  city: string;
-  cond: string;
-  letter: "A" | "B" | "C";
-  price: number;
-  recommended?: boolean;
-  time: string;
-  verdict: string;
-}
-
-export const QUOTE_CANDIDATES: QuoteCandidate[] = [
-  {
-    letter: "A",
-    verdict: "Recommended",
-    city: "Paris · 8e",
-    cond: "New, full set, plastic on hardware",
-    price: 12_400,
-    time: "6 days · hand-carried",
-    recommended: true,
-  },
-  {
-    letter: "B",
-    verdict: "Best value",
-    city: "Hong Kong · IFC",
-    cond: "Excellent, complete dust cover",
-    price: 11_900,
-    time: "11 days · DHL Plus",
-  },
-  {
-    letter: "C",
-    verdict: "On request",
-    city: "Tokyo · private sale",
-    cond: "New, embossed gift box",
-    price: 13_750,
-    time: "4–5 weeks · sale process",
-  },
-];
-
-export type OrderStageState = "done" | "cur" | "wait";
-export interface OrderStage {
-  d: string;
-  s: OrderStageState;
-  t: string;
-  w: string;
-}
-
-export const ORDER_STAGES: OrderStage[] = [
-  {
-    t: "Quote approved",
-    w: "14 May · 09:42 GMT+8",
-    s: "done",
-    d: "You authorised Candidate A — Paris. Funds in escrow.",
-  },
-  {
-    t: "Concierge collecting",
-    w: "15 May · 11:20 GMT+1",
-    s: "done",
-    d: "Hsiao-Yu retrieved the piece from the Faubourg Saint-Honoré boutique.",
-  },
-  {
-    t: "Authenticated · vault inbound",
-    w: "16 May · 18:55 GMT+8",
-    s: "cur",
-    d: "First inspection complete in Paris. Currently in the air — Air France 197.",
-  },
-  {
-    t: "Second inspection · Taipei",
-    w: "expected 19 May",
-    s: "wait",
-    d: "18-image macro dossier will be uploaded to your file.",
-  },
-  {
-    t: "Hand-delivered",
-    w: "expected 21 May · 14:00–18:00",
-    s: "wait",
-    d: "Signature on receipt · lifetime authentication card included.",
-  },
-];
-
-export interface PaymentMethod {
-  id: "card" | "ecpay" | "line";
-  name: string;
-  sub: string;
-}
-export const PAYMENT_METHODS: PaymentMethod[] = [
-  { id: "card", name: "Card", sub: "Stripe · 3DS" },
-  { id: "ecpay", name: "ECPay", sub: "TWD only · 0% interest 12mo" },
-  { id: "line", name: "LINE Pay", sub: "instant · TWD" },
-];
