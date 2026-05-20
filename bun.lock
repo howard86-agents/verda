@@ -30,7 +30,7 @@
       "devDependencies": {
         "@types/bun": "latest",
         "@verda/typescript-config": "*",
-        "typescript": "5.5.4",
+        "typescript": "6.0.3",
       },
     },
     "apps/web": {
@@ -49,7 +49,7 @@
         "@types/react-dom": "^18.2.19",
         "@verda/typescript-config": "*",
         "tailwindcss": "^4",
-        "typescript": "5.5.4",
+        "typescript": "6.0.3",
       },
     },
     "packages/config-typescript": {
@@ -61,7 +61,7 @@
       "version": "1.0.0",
       "devDependencies": {
         "@verda/typescript-config": "*",
-        "typescript": "5.5.4",
+        "typescript": "6.0.3",
       },
     },
     "packages/database": {
@@ -80,7 +80,7 @@
         "rimraf": "^5.0.5",
         "tsup": "^8.0.2",
         "tsx": "4.21.0",
-        "typescript": "5.5.4",
+        "typescript": "6.0.3",
       },
     },
   },
@@ -895,7 +895,7 @@
 
     "turbo": ["turbo@2.9.12", "", { "optionalDependencies": { "@turbo/darwin-64": "2.9.12", "@turbo/darwin-arm64": "2.9.12", "@turbo/linux-64": "2.9.12", "@turbo/linux-arm64": "2.9.12", "@turbo/windows-64": "2.9.12", "@turbo/windows-arm64": "2.9.12" }, "bin": { "turbo": "bin/turbo" } }, "sha512-lCPgus1NuTiBdaITWqzSH/Ff6HVL8HHGBtOXHg1dHRfcshN79XkygSdh0M6g8b0td91ILLG5MTkLOkp5UvyPJw=="],
 
-    "typescript": ["typescript@5.5.4", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-Mtq29sKDAEYP7aljRgtPOpTvOfbwRWlS6dPRzwjdE+C0R4brX/GUyhHSecbHMFLNBLcJIPt9nl9yG5TZ1weH+Q=="],
+    "typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "ufo": ["ufo@1.6.4", "", {}, "sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA=="],
 
