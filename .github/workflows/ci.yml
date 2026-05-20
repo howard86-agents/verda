@@ -21,7 +21,7 @@ jobs:
       DATABASE_URL: postgresql://placeholder@localhost:5432/placeholder
       TURBO_TELEMETRY_DISABLED: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Required for gitleaks to scan history, not just the tip commit.
           fetch-depth: 0
