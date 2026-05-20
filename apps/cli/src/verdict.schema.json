@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ImageReviewVerdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["winner", "reason", "facets"],
+  "properties": {
+    "winner": {
+      "type": "string",
+      "enum": ["existing", "new"],
+      "description": "Which image better matches the editorial style suffix overall."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 10,
+      "description": "One or two sentences explaining the deciding factor across the five facets."
+    },
+    "facets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backdrop", "lighting", "palette", "grain", "composition"],
+      "properties": {
+        "backdrop": { "$ref": "#/$defs/facetScore" },
+        "lighting": { "$ref": "#/$defs/facetScore" },
+        "palette": { "$ref": "#/$defs/facetScore" },
+        "grain": { "$ref": "#/$defs/facetScore" },
+        "composition": { "$ref": "#/$defs/facetScore" }
+      }
+    }
+  },
+  "$defs": {
+    "facetScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existing", "new"],
+      "properties": {
+        "existing": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "new": { "type": "integer", "minimum": 0, "maximum": 5 }
+      }
+    }
+  }
+}
