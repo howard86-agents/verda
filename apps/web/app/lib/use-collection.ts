@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
+import { useRewardToast } from "@/_components/reward-toast";
 import { useAuth } from "./auth";
 import { track } from "./track";
 
@@ -26,6 +27,7 @@ export function useCollectionIds() {
 export function useToggleSave(articleId: string) {
   const { member } = useAuth();
   const qc = useQueryClient();
+  const { push: pushToast } = useRewardToast();
   const id = member?.id ?? "";
   const key = ["collectionIds", id];
 
@@ -36,13 +38,29 @@ export function useToggleSave(articleId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ memberId: id, articleId }),
       });
-      return res.json();
+      return res.json() as Promise<{
+        ok: boolean;
+        alreadySaved?: boolean;
+        points?: number;
+      }>;
     },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<string[]>(key) ?? [];
       qc.setQueryData<string[]>(key, [...prev, articleId]);
       return { prev };
+    },
+    onSuccess: (data) => {
+      // Only surface the reward toast when a save actually granted points.
+      // A second save of the same article responds with `alreadySaved: true`
+      // and no points — per acceptance #4, no false "earned" toast.
+      if (
+        !data.alreadySaved &&
+        typeof data.points === "number" &&
+        data.points > 0
+      ) {
+        pushToast({ kind: "collect", points: data.points });
+      }
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) {

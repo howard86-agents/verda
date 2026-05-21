@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ArticleBody } from "@/_components/article-body";
 import { CoverImage } from "@/_components/cover-image";
 import { IconBookmark, IconShare } from "@/_components/glyphs";
+import { useRewardToast } from "@/_components/reward-toast";
 import { useAuth } from "@/lib/auth";
 import type { Article } from "@/lib/db";
 import { track } from "@/lib/track";
@@ -91,6 +92,7 @@ function DetailReaderBody({ article }: { article: Article }) {
   const [progress, setProgress] = useState(0);
   const { member } = useAuth();
   const { isSaved, toggle: toggleSave } = useToggleSave(article.id);
+  const { push: pushToast } = useRewardToast();
 
   const handleReadComplete = useCallback(async () => {
     if (!member) {
@@ -108,15 +110,28 @@ function DetailReaderBody({ article }: { article: Article }) {
         }),
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as {
+          level?: number;
+          points?: number;
+        };
         if (data.level && data.level > 0) {
           track("growth_item_level_up", { level: data.level });
+        }
+        // Show a reward toast only when points actually granted —
+        // a 409 (already rewarded for this article) is res.ok=false and
+        // is naturally skipped here, per acceptance #4 of issue #79.
+        if (typeof data.points === "number" && data.points > 0) {
+          pushToast({
+            kind: "read",
+            points: data.points,
+            subtitle: article.title,
+          });
         }
       }
     } catch {
       // silent
     }
-  }, [member, article.id]);
+  }, [member, article.id, article.title, pushToast]);
 
   const { bottomRef } = useReadComplete({
     enabled: !!member,
