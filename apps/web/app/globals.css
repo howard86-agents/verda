@@ -206,3 +206,19 @@
   padding-right: env(safe-area-inset-right);
   padding-left: env(safe-area-inset-left);
 }
+
+/* Branded loading splash — issue #78. Indeterminate progress sweep used
+   while MSW + Dexie seed are still booting. */
+@keyframes verda-splash-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.verda-splash-bar {
+  width: 100%;
+  animation: verda-splash-sweep 1.4s ease-in-out infinite;
+}
