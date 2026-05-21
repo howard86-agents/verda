@@ -1,8 +1,12 @@
 // Shared CMS shell — dark sidebar + sticky topbar. The sidebar stays dark in
 // both themes (admin chrome, not a themed surface).
 
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type { CmsRole } from "@/lib/cms-auth";
+import { adminIdFor, useCmsAuth } from "@/lib/cms-auth";
 import { IconSearch } from "./glyphs";
 
 const NAV = [
@@ -19,6 +23,13 @@ const NAV = [
 
 type NavId = (typeof NAV)[number]["id"];
 
+const ROLES: { id: CmsRole; label: string }[] = [
+  { id: "editor", label: "Editor" },
+  { id: "publisher", label: "Publisher" },
+  { id: "admin", label: "Admin" },
+  { id: "customer-service", label: "CS" },
+];
+
 export function CmsShell({
   active = "articles",
   breadcrumb = "CMS",
@@ -30,6 +41,7 @@ export function CmsShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const { role, setRole } = useCmsAuth();
   return (
     <div className="grid min-h-screen grid-cols-[232px_1fr] bg-cream text-ink max-[860px]:grid-cols-1">
       {/* Sidebar — always dark */}
@@ -84,16 +96,38 @@ export function CmsShell({
             );
           })}
         </nav>
-        <div className="border-white/10 border-t px-5 py-[14px] font-mono text-[10px] text-white/50 uppercase tracking-[0.12em]">
-          <div className="flex items-center gap-[10px]">
+        {/* Role switcher */}
+        <div className="border-white/10 border-t px-5 py-[14px]">
+          <div className="mb-2 font-mono text-[9px] text-white/40 uppercase tracking-[0.18em]">
+            Role · dev
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {ROLES.map((r) => (
+              <button
+                className={`px-2 py-[3px] font-mono text-[10px] uppercase tracking-[0.12em] ${
+                  r.id === role
+                    ? "bg-vermilion text-cream"
+                    : "bg-white/10 text-white/60 hover:text-white"
+                }`}
+                key={r.id}
+                onClick={() => setRole(r.id)}
+                type="button"
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center gap-[10px]">
             <span className="grid size-7 place-items-center bg-vermilion font-display text-[#fafaf7] text-[12px]">
-              H
+              {role[0].toUpperCase()}
             </span>
             <span>
               <span className="block font-sans text-[#fafaf7] text-[12px] normal-case">
-                H. Tsai
+                {adminIdFor(role)}
               </span>
-              <span className="block">Publisher</span>
+              <span className="block font-mono text-[10px] text-white/50 uppercase tracking-[0.12em]">
+                {role}
+              </span>
             </span>
           </div>
         </div>
