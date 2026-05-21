@@ -1,4 +1,4 @@
-import { GROWTH_LEVELS, STORIES } from "@verda/data";
+import { GROWTH_LEVELS, MEMBER, STORIES } from "@verda/data";
 import { db } from "./db";
 
 const SEED_KEY = "verda.seeded";
@@ -39,6 +39,13 @@ export async function seedIfEmpty() {
       threshold: g.threshold,
     }))
   );
+
+  await db.members.put({
+    id: MEMBER.memberId,
+    name: MEMBER.name,
+    email: MEMBER.email,
+    joined: MEMBER.joined,
+  });
 
   localStorage.setItem(SEED_KEY, "1");
 }

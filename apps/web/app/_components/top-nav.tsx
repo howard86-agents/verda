@@ -3,6 +3,7 @@
 import { GROWTH } from "@verda/data";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "../lib/auth";
 import { useTheme } from "../providers";
 import { IconDrop, IconSearch } from "./glyphs";
 
@@ -76,6 +77,7 @@ function ThemeToggle() {
 
 export function TopNav() {
   const pathname = usePathname();
+  const { member, login } = useAuth();
   return (
     <header className="sticky top-0 z-10 border-line border-b bg-paper">
       <div className="shell grid grid-cols-[auto_1fr_auto] items-center gap-7 py-[14px] max-[900px]:grid-cols-[1fr_auto]">
@@ -123,17 +125,32 @@ export function TopNav() {
           <span className="inline-flex">
             <IconSearch />
           </span>
-          <span className="flex items-center gap-[6px] border border-ink px-[10px] py-[5px] font-mono text-[10.5px] uppercase tracking-[0.14em] max-[560px]:hidden">
-            <span className="inline-flex text-vermilion">
-              <IconDrop />
-            </span>
-            <strong className="font-medium">{GROWTH.nutrients}</strong>
-            <span className="text-muted">NUT.</span>
-          </span>
-          <ThemeToggle />
-          <span className="grid size-[30px] place-items-center bg-ink font-display text-[13px] text-cream">
-            M
-          </span>
+          {member ? (
+            <>
+              <span className="flex items-center gap-[6px] border border-ink px-[10px] py-[5px] font-mono text-[10.5px] uppercase tracking-[0.14em] max-[560px]:hidden">
+                <span className="inline-flex text-vermilion">
+                  <IconDrop />
+                </span>
+                <strong className="font-medium">{GROWTH.nutrients}</strong>
+                <span className="text-muted">NUT.</span>
+              </span>
+              <ThemeToggle />
+              <span className="grid size-[30px] place-items-center bg-ink font-display text-[13px] text-cream">
+                {member.initial}
+              </span>
+            </>
+          ) : (
+            <>
+              <ThemeToggle />
+              <button
+                className="border border-ink px-[10px] py-[5px] font-mono text-[10.5px] uppercase tracking-[0.14em]"
+                onClick={login}
+                type="button"
+              >
+                Sign in
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>
