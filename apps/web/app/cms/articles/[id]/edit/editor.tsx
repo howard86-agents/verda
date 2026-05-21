@@ -9,7 +9,7 @@ import { CATEGORIES } from "@verda/data";
 import NextLink from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CmsShell } from "@/_components/cms-shell";
-import { can, useCmsAuth } from "@/lib/cms-auth";
+import { adminIdFor, can, useCmsAuth } from "@/lib/cms-auth";
 
 interface ArticleData {
   author: string;
@@ -22,6 +22,15 @@ interface ArticleData {
   status: string;
   tag: string;
   title: string;
+}
+
+interface VersionEntry {
+  bodyJson: string;
+  editor: string;
+  id: string;
+  status: string;
+  summary: string;
+  timestamp: string;
 }
 
 function ToolbarBtn({
@@ -56,7 +65,15 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
   const [kind, setKind] = useState("brand");
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [versions, setVersions] = useState<VersionEntry[]>([]);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadVersions = useCallback(async (id: string) => {
+    const res = await fetch(`/api/cms/articles/${id}/versions`);
+    if (res.ok) {
+      setVersions(await res.json());
+    }
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -95,7 +112,8 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
           }
         }
       });
-  }, [articleId, editor]);
+    loadVersions(articleId);
+  }, [articleId, editor, loadVersions]);
 
   const save = useCallback(async () => {
     if (!editor) {
@@ -121,9 +139,25 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
 
     if (res.ok) {
       const data = await res.json();
+      const savedId = articleId || data.id;
       if (!articleId) {
         setArticle(data);
       }
+      // Record version
+      await fetch(`/api/cms/articles/${savedId}/versions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-cms-role": role,
+        },
+        body: JSON.stringify({
+          editor: adminIdFor(role),
+          status: data.status || "draft",
+          bodyJson,
+          summary: "",
+        }),
+      });
+      await loadVersions(savedId);
       setLastSaved(
         new Date().toLocaleTimeString([], {
           hour: "2-digit",
@@ -132,7 +166,19 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
       );
     }
     setSaving(false);
-  }, [editor, title, jp, slug, cat, tag, author, kind, articleId, role]);
+  }, [
+    editor,
+    title,
+    jp,
+    slug,
+    cat,
+    tag,
+    author,
+    kind,
+    articleId,
+    role,
+    loadVersions,
+  ]);
 
   // Autosave on content change
   useEffect(() => {
@@ -374,6 +420,63 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
               </label>
             </div>
           </div>
+
+          {/* Version History */}
+          {articleId && (
+            <div className="border border-line bg-paper">
+              <div className="border-line border-b px-[14px] py-[10px] font-mono text-[10.5px] text-ink uppercase tracking-[0.18em]">
+                Versions · {versions.length}
+              </div>
+              <div className="max-h-[240px] overflow-y-auto">
+                {versions.length === 0 ? (
+                  <div className="px-[14px] py-3 font-mono text-[10px] text-muted">
+                    No versions yet
+                  </div>
+                ) : (
+                  versions.map((v) => (
+                    <div
+                      className="flex items-center justify-between border-line border-b px-[14px] py-[10px] last:border-b-0"
+                      key={v.id}
+                    >
+                      <div>
+                        <div className="font-mono text-[10px] text-ink tracking-[0.06em]">
+                          {new Date(v.timestamp).toLocaleString([], {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                        <div className="font-mono text-[9px] text-muted tracking-[0.06em]">
+                          {v.editor} · {v.status}
+                        </div>
+                      </div>
+                      {canEdit && (
+                        <button
+                          className="font-mono text-[9px] text-vermilion uppercase tracking-[0.1em]"
+                          onClick={() => {
+                            if (!editor) {
+                              return;
+                            }
+                            try {
+                              editor.commands.setContent(
+                                JSON.parse(v.bodyJson)
+                              );
+                            } catch {
+                              // ignore parse errors
+                            }
+                          }}
+                          type="button"
+                        >
+                          Restore
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </aside>
       </section>
       <div className="h-10" />

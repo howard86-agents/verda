@@ -72,6 +72,16 @@ export interface GrowthRule {
   threshold: number;
 }
 
+export interface ArticleVersion {
+  articleId: string;
+  bodyJson: string;
+  editor: string;
+  id: string;
+  status: string;
+  summary: string;
+  timestamp: string;
+}
+
 const db = new Dexie("verda") as Dexie & {
   articles: EntityTable<Article, "id">;
   members: EntityTable<Member, "id">;
@@ -81,6 +91,7 @@ const db = new Dexie("verda") as Dexie & {
   collections: EntityTable<Collection, "id">;
   rewardRules: EntityTable<RewardRule, "id">;
   growthRules: EntityTable<GrowthRule, "level">;
+  articleVersions: EntityTable<ArticleVersion, "id">;
 };
 
 db.version(1).stores({
@@ -92,6 +103,7 @@ db.version(1).stores({
   collections: "++id, memberId, articleId, [memberId+articleId]",
   rewardRules: "id, action",
   growthRules: "level",
+  articleVersions: "id, articleId, timestamp",
 });
 
 export { db };
