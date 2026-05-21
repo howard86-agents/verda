@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { GrowthLevel } from "@verda/data";
 import { GROWTH_LEVELS } from "@verda/data";
 import { AuthGate } from "@/_components/auth-gate";
 import { CheckInButton } from "@/_components/check-in-button";
@@ -9,7 +8,7 @@ import { Eyebrow } from "@/_components/eyebrow";
 import { IconDrop } from "@/_components/glyphs";
 import { Plant } from "@/_components/plant";
 import { useAuth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, type GrowthRule } from "@/lib/db";
 
 const CORNERS = [
   { pos: "top-[8px] left-[8px]", border: "border-t border-l" },
@@ -18,11 +17,20 @@ const CORNERS = [
   { pos: "bottom-[8px] right-[8px]", border: "border-b border-r" },
 ] as const;
 
-function pipClass(p: GrowthLevel, currentLevel: number) {
-  if (p.n === currentLevel) {
+// Static fallback used until Dexie loads (e.g. first paint, SSR, or empty DB).
+// Once db.growthRules has been seeded the live values take over.
+const FALLBACK_RULES: GrowthRule[] = GROWTH_LEVELS.map((g) => ({
+  level: g.n,
+  name: g.name,
+  jp: g.jp,
+  threshold: g.threshold,
+}));
+
+function pipClass(rule: GrowthRule, currentLevel: number) {
+  if (rule.level === currentLevel) {
     return "border-ink bg-ink text-cream";
   }
-  const done = p.n < currentLevel;
+  const done = rule.level < currentLevel;
   const tone = done ? "text-ink" : "text-muted";
   return `border-line bg-paper ${tone}`;
 }
@@ -54,11 +62,25 @@ export default function Page() {
     },
   });
 
+  // Live growth rules from Dexie — admin edits via /cms/growth-rules update
+  // these and the page picks them up on the next render. Falls back to the
+  // static @verda/data data until the table is populated (first paint or
+  // before seedIfEmpty has run).
+  const { data: growthRules = FALLBACK_RULES } = useQuery({
+    queryKey: ["growth-rules"],
+    queryFn: async () => {
+      const rows = await db.growthRules.orderBy("level").toArray();
+      return rows.length > 0 ? rows : FALLBACK_RULES;
+    },
+  });
+
   const level = growth?.level ?? 1;
   const nutrients = growth?.nutrients ?? 0;
-  const currentLevelData = GROWTH_LEVELS.find((g) => g.n === level);
-  const nextLevel = GROWTH_LEVELS.find((g) => g.n === level + 1);
-  const nextThreshold = nextLevel?.threshold ?? 300;
+  const sortedRules = [...growthRules].sort((a, b) => a.level - b.level);
+  const currentLevelData = sortedRules.find((g) => g.level === level);
+  const nextLevel = sortedRules.find((g) => g.level === level + 1);
+  const lastRule = sortedRules.at(-1);
+  const nextThreshold = nextLevel?.threshold ?? lastRule?.threshold ?? 300;
   const progressPct =
     nextThreshold > 0 ? Math.min((nutrients / nextThreshold) * 100, 100) : 100;
 
@@ -141,17 +163,22 @@ export default function Page() {
               </div>
 
               {/* Level pips */}
-              <div className="mt-[18px] grid grid-cols-4 gap-[8px]">
-                {GROWTH_LEVELS.map((p) => (
+              <div
+                className="mt-[18px] grid gap-[8px]"
+                style={{
+                  gridTemplateColumns: `repeat(${sortedRules.length}, minmax(0, 1fr))`,
+                }}
+              >
+                {sortedRules.map((p) => (
                   <div
                     className={`border px-[10px] py-[14px] text-center ${pipClass(p, level)}`}
-                    key={p.n}
+                    key={p.level}
                   >
                     <div className="font-mono text-[9.5px] tracking-[0.18em] opacity-75">
-                      LV {String(p.n).padStart(2, "0")}
+                      LV {String(p.level).padStart(2, "0")}
                     </div>
                     <div
-                      className={`mt-1 font-display text-[16px] ${p.n === level ? "font-medium" : "font-normal"}`}
+                      className={`mt-1 font-display text-[16px] ${p.level === level ? "font-medium" : "font-normal"}`}
                     >
                       {p.name}
                     </div>
