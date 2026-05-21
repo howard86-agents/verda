@@ -47,6 +47,30 @@ export async function seedIfEmpty() {
     joined: MEMBER.joined,
   });
 
+  await db.rewardRules.bulkPut([
+    {
+      id: "rr_read",
+      action: "read_complete",
+      points: 10,
+      enabled: true,
+      limitType: "per-article",
+    },
+    {
+      id: "rr_checkin",
+      action: "daily_check_in",
+      points: 5,
+      enabled: true,
+      limitType: "per-day",
+    },
+    {
+      id: "rr_collect",
+      action: "collect",
+      points: 2,
+      enabled: true,
+      limitType: "per-article",
+    },
+  ]);
+
   localStorage.setItem(SEED_KEY, "1");
 }
 

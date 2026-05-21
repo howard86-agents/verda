@@ -2,9 +2,12 @@
 
 import { STORIES, type Story } from "@verda/data";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CoverImage } from "@/_components/cover-image";
 import { IconBookmark, IconShare } from "@/_components/glyphs";
+import { useAuth } from "@/lib/auth";
+import { track } from "@/lib/track";
+import { useReadComplete } from "@/lib/use-read-complete";
 
 const TOC = [
   { n: "I", t: "A Sunday in February", on: true },
@@ -18,6 +21,42 @@ const TAGS = ["morning", "notebooks", "sundays", "letters"];
 export function DetailReader({ story }: { story: Story }) {
   const [saved, setSaved] = useState(true);
   const [progress, setProgress] = useState(0);
+  const { member } = useAuth();
+
+  const handleReadComplete = useCallback(async () => {
+    if (!member) {
+      return;
+    }
+    track("story_read_complete", { articleId: story.id });
+    try {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "read_complete",
+          memberId: member.id,
+          articleId: story.id,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.level && data.level > 0) {
+          track("growth_item_level_up", { level: data.level });
+        }
+      }
+    } catch {
+      // silent
+    }
+  }, [member, story.id]);
+
+  const { bottomRef } = useReadComplete({
+    enabled: !!member,
+    onComplete: handleReadComplete,
+  });
+
+  useEffect(() => {
+    track("story_view", { articleId: story.id, slug: story.slug });
+  }, [story.id, story.slug]);
 
   useEffect(() => {
     let raf = 0;
@@ -256,6 +295,7 @@ export function DetailReader({ story }: { story: Story }) {
                 </span>
               ))}
             </div>
+            <div ref={bottomRef} />
           </div>
 
           {/* Right sidebar — author + reward */}

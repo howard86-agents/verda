@@ -84,7 +84,8 @@ const db = new Dexie("verda") as Dexie & {
 db.version(1).stores({
   articles: "id, slug, kind, cat, tag",
   members: "id, email",
-  behaviorLogs: "++id, memberId, action, articleId",
+  behaviorLogs:
+    "++id, memberId, action, articleId, [memberId+action+articleId]",
   pointLedger: "++id, memberId",
   growthItems: "++id, memberId",
   collections: "++id, memberId, articleId, [memberId+articleId]",
