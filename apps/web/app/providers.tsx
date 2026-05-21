@@ -11,6 +11,7 @@ import {
 } from "react";
 import { AuthProvider } from "./lib/auth";
 import { CmsAuthProvider } from "./lib/cms-auth";
+import { GA4Provider } from "./lib/ga4-provider";
 import { seedIfEmpty } from "./lib/seed";
 
 interface ThemeCtx {
@@ -88,7 +89,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeContext.Provider value={value}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <CmsAuthProvider>{children}</CmsAuthProvider>
+          <CmsAuthProvider>
+            <GA4Provider>{children}</GA4Provider>
+          </CmsAuthProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeContext.Provider>
