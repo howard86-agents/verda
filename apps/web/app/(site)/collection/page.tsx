@@ -1,6 +1,6 @@
 "use client";
 
-import { COLLECTED, STORIES } from "@verda/data";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { AuthGate } from "@/_components/auth-gate";
@@ -8,6 +8,10 @@ import { CoverImage } from "@/_components/cover-image";
 import { IconBookmark, IconDrop } from "@/_components/glyphs";
 import { Plant } from "@/_components/plant";
 import { StatSlab } from "@/_components/stat-slab";
+import { useAuth } from "@/lib/auth";
+import type { Article } from "@/lib/db";
+import { db } from "@/lib/db";
+import { useToggleSave } from "@/lib/use-collection";
 
 type TabId = "saved" | "read" | "items" | "activity";
 
@@ -16,19 +20,6 @@ const TABS: { id: TabId; n: string; jp: string }[] = [
   { id: "read", n: "Read", jp: "読了" },
   { id: "items", n: "Items earned", jp: "獲得" },
   { id: "activity", n: "Activity", jp: "記録" },
-];
-
-const STATS: {
-  n: string;
-  en: string;
-  jp: string;
-  divider?: boolean;
-  accent?: boolean;
-}[] = [
-  { n: "14", en: "Read", jp: "読了" },
-  { n: "3", en: "Saved", jp: "保存", divider: true },
-  { n: "87", en: "Nutrients", jp: "滋養", divider: true, accent: true },
-  { n: "02", en: "Level", jp: "Sprout · 芽", divider: true },
 ];
 
 const HEATMAP_ROWS = 8;
@@ -47,14 +38,119 @@ function heatOpacity(v: number) {
   return 0.15;
 }
 
+function SavedCard({ article, num }: { article: Article; num: string }) {
+  const { toggle, isSaved } = useToggleSave(article.id);
+  return (
+    <article className="relative">
+      <Link href={`/stories/${article.slug}`}>
+        <div className="relative">
+          <CoverImage
+            alt={article.title}
+            className="aspect-[4/5]"
+            gradient={article.img}
+            id={article.id}
+            kind="stories"
+            sizes="(max-width: 560px) 100vw, (max-width: 860px) 50vw, 25vw"
+          />
+          <div className="absolute top-3 left-3 z-10 font-display font-medium text-[22px] text-white leading-none [text-shadow:0_1px_6px_rgba(0,0,0,0.5)]">
+            {num}
+          </div>
+        </div>
+        <div className="mt-3">
+          <div className="font-mono text-[9.5px] text-muted uppercase tracking-[0.16em]">
+            {article.cat} · {article.read} min
+          </div>
+          <div className="mt-1 line-clamp-2 font-display text-[17px] leading-[1.18]">
+            {article.title}
+          </div>
+          <div className="mt-[3px] font-display text-[12px] text-muted italic">
+            {article.jp}
+          </div>
+        </div>
+      </Link>
+      <button
+        aria-label={isSaved ? "Unsave" : "Save"}
+        className="absolute top-[10px] right-[10px] z-10 flex size-[28px] items-center justify-center bg-vermilion text-cream"
+        onClick={toggle}
+        type="button"
+      >
+        <IconBookmark filled={isSaved} size={20} />
+      </button>
+    </article>
+  );
+}
+
 export default function Page() {
   const [tab, setTab] = useState<TabId>("saved");
-  const saved = STORIES.filter((s) => COLLECTED.includes(s.id));
-  const savedCards = [...saved, ...STORIES.slice(0, 1)].map((s, i) => ({
-    story: s,
-    num: String(i + 1).padStart(2, "0"),
-    key: `${s.id}-${i + 1}`,
-  }));
+  const { member } = useAuth();
+  const memberId = member?.id ?? "";
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["collection", memberId],
+    enabled: !!member,
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/collections?memberId=${encodeURIComponent(memberId)}`
+      );
+      return res.json() as Promise<{ articles: Article[] }>;
+    },
+  });
+
+  const { data: growth } = useQuery({
+    queryKey: ["growth", memberId],
+    enabled: !!member,
+    queryFn: async () => {
+      const item = await db.growthItems
+        .where("memberId")
+        .equals(memberId)
+        .first();
+      return item ?? { level: 1, nutrients: 0 };
+    },
+  });
+
+  const { data: readArticles } = useQuery({
+    queryKey: ["readArticles", memberId],
+    enabled: !!member,
+    queryFn: async () => {
+      const logs = await db.behaviorLogs
+        .where("memberId")
+        .equals(memberId)
+        .filter((l) => l.action === "read_complete")
+        .toArray();
+      const ids = logs.map((l) => l.articleId).filter(Boolean) as string[];
+      if (ids.length === 0) {
+        return [];
+      }
+      return db.articles.where("id").anyOf(ids).toArray();
+    },
+  });
+
+  const saved = data?.articles ?? [];
+  const nutrients = growth?.nutrients ?? 0;
+  const level = growth?.level ?? 1;
+
+  const STATS = [
+    { n: String(readArticles?.length ?? 0), en: "Read", jp: "読了" },
+    {
+      n: String(saved.length),
+      en: "Saved",
+      jp: "保存",
+      divider: true,
+    },
+    {
+      n: String(nutrients),
+      en: "Nutrients",
+      jp: "滋養",
+      divider: true,
+      accent: true,
+    },
+    {
+      n: String(level).padStart(2, "0"),
+      en: "Level",
+      jp: "Sprout · 芽",
+      divider: true,
+    },
+  ];
 
   return (
     <AuthGate>
@@ -63,17 +159,18 @@ export default function Page() {
         <section className="shell pt-10">
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-7 max-[640px]:grid-cols-1 max-[640px]:gap-4">
             <div className="flex size-[88px] items-center justify-center bg-ink font-display font-medium text-[40px] text-cream">
-              M
+              {member?.initial ?? "M"}
             </div>
             <div>
               <div className="font-mono text-[10.5px] text-muted uppercase tracking-[0.22em]">
                 Member · 会員
               </div>
               <h1 className="mt-[6px] font-display font-medium text-[48px] leading-none tracking-[-0.015em] max-[560px]:text-[36px]">
-                Mira&apos;s collection<span className="text-vermilion">.</span>
+                {member?.name ?? "Member"}&apos;s collection
+                <span className="text-vermilion">.</span>
               </h1>
               <div className="mt-2 font-mono text-[10.5px] text-muted uppercase tracking-[0.12em]">
-                Joined Mar 2026 · 91APP linked · Member ID 4421
+                Member ID {member?.id ?? "—"}
               </div>
             </div>
             <button
@@ -120,55 +217,59 @@ export default function Page() {
 
         {/* Content */}
         {tab === "saved" && (
-          <section className="shell grid grid-cols-4 gap-8 pt-9 max-[1100px]:grid-cols-3 max-[560px]:grid-cols-1 max-[860px]:grid-cols-2">
-            {savedCards.map(({ story: s, num, key }) => (
-              <Link href={`/stories/${s.slug}`} key={key}>
-                <article>
-                  <div className="relative">
-                    <CoverImage
-                      alt={s.title}
-                      className="aspect-[4/5]"
-                      gradient={s.img}
-                      id={s.id}
-                      kind="stories"
-                      sizes="(max-width: 560px) 100vw, (max-width: 860px) 50vw, 25vw"
-                    />
-                    <div className="absolute top-3 left-3 z-10 font-display font-medium text-[22px] text-white leading-none [text-shadow:0_1px_6px_rgba(0,0,0,0.5)]">
-                      {num}
-                    </div>
-                    <div className="absolute top-[10px] right-[10px] z-10 flex size-[28px] items-center justify-center bg-vermilion text-cream">
-                      <IconBookmark filled size={20} />
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <div className="font-mono text-[9.5px] text-muted uppercase tracking-[0.16em]">
-                      {s.cat} · {s.read} min
-                    </div>
-                    <div className="mt-1 line-clamp-2 font-display text-[17px] leading-[1.18]">
-                      {s.title}
-                    </div>
-                    <div className="mt-[3px] font-display text-[12px] text-muted italic">
-                      {s.jp}
-                    </div>
-                  </div>
-                </article>
-              </Link>
-            ))}
-            {/* empty placeholder */}
-            <div className="flex aspect-[4/5] flex-col items-center justify-center border border-muted border-dashed p-[18px] text-center text-muted">
-              <div className="font-display font-light text-[44px] leading-none">
-                ＋
+          <section className="shell pt-9">
+            {isLoading && (
+              <div className="py-12 text-center font-mono text-[11px] text-muted uppercase tracking-[0.14em]">
+                Loading…
               </div>
-              <div className="mt-[10px] font-mono text-[10.5px] uppercase tracking-[0.14em]">
-                Save more to keep
+            )}
+            {!isLoading && saved.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="font-display font-light text-[44px] leading-none">
+                  ＋
+                </div>
+                <div className="mt-[10px] font-mono text-[10.5px] text-muted uppercase tracking-[0.14em]">
+                  No saved stories yet · 保存なし
+                </div>
+                <Link
+                  className="mt-4 border border-ink px-[18px] py-2 font-mono text-[11px] text-ink uppercase tracking-[0.18em]"
+                  href="/stories"
+                >
+                  Browse stories →
+                </Link>
               </div>
-            </div>
+            )}
+            {!isLoading && saved.length > 0 && (
+              <div className="grid grid-cols-4 gap-8 max-[1100px]:grid-cols-3 max-[560px]:grid-cols-1 max-[860px]:grid-cols-2">
+                {saved.map((s, i) => (
+                  <SavedCard
+                    article={s}
+                    key={s.id}
+                    num={String(i + 1).padStart(2, "0")}
+                  />
+                ))}
+                {/* empty placeholder */}
+                <div className="flex aspect-[4/5] flex-col items-center justify-center border border-muted border-dashed p-[18px] text-center text-muted">
+                  <div className="font-display font-light text-[44px] leading-none">
+                    ＋
+                  </div>
+                  <div className="mt-[10px] font-mono text-[10.5px] uppercase tracking-[0.14em]">
+                    Save more to keep
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         )}
 
         {tab === "read" && (
           <section className="shell pt-6">
-            {STORIES.slice(0, 5).map((s, i) => (
+            {(readArticles ?? []).length === 0 && (
+              <div className="py-12 text-center font-mono text-[11px] text-muted uppercase tracking-[0.14em]">
+                No articles read yet.
+              </div>
+            )}
+            {(readArticles ?? []).map((s, i) => (
               <div
                 className="grid grid-cols-[48px_80px_1fr_auto_auto] items-center gap-[18px] border-line border-b py-[18px] max-[640px]:grid-cols-[40px_64px_1fr]"
                 key={s.id}
@@ -195,9 +296,12 @@ export default function Page() {
                 <div className="flex items-center gap-[6px] font-mono text-[11px] text-vermilion tracking-[0.12em] max-[640px]:hidden">
                   <IconDrop size={14} /> +10 NUT
                 </div>
-                <div className="font-mono text-[10.5px] text-ink uppercase tracking-[0.16em] max-[640px]:hidden">
+                <Link
+                  className="font-mono text-[10.5px] text-ink uppercase tracking-[0.16em] max-[640px]:hidden"
+                  href={`/stories/${s.slug}`}
+                >
                   Re-open →
-                </div>
+                </Link>
               </div>
             ))}
           </section>
@@ -206,7 +310,7 @@ export default function Page() {
         {tab === "items" && (
           <section className="shell grid grid-cols-2 items-center gap-[60px] pt-12 max-[860px]:grid-cols-1 max-[860px]:gap-10">
             <div className="text-center">
-              <Plant level={2} size={260} />
+              <Plant level={level} size={260} />
             </div>
             <div>
               <div className="font-mono text-[11px] text-vermilion uppercase tracking-[0.22em]">
@@ -221,12 +325,12 @@ export default function Page() {
                 Fully grown items appear here once you redeem them. Until then,
                 keep tending.
               </div>
-              <button
-                className="mt-[22px] bg-ink px-[22px] py-3 font-mono text-[11px] text-cream uppercase tracking-[0.18em]"
-                type="button"
+              <Link
+                className="mt-[22px] inline-block bg-ink px-[22px] py-3 font-mono text-[11px] text-cream uppercase tracking-[0.18em]"
+                href="/grow"
               >
                 View seedling →
-              </button>
+              </Link>
             </div>
           </section>
         )}
