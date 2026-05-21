@@ -26,7 +26,7 @@ const NAV = [
     id: "readers",
     en: "Readers",
     jp: "読者",
-    href: "/readers/field-notes-remix",
+    href: "/readers",
     match: (p: string) => p.startsWith("/readers"),
   },
   {

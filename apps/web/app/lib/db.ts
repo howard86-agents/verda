@@ -13,6 +13,7 @@ export interface Article {
   kind: string;
   read: number;
   slug: string;
+  src?: string;
   status?: string;
   sum: string;
   tag: string;
