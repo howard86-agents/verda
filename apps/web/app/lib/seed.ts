@@ -335,6 +335,36 @@ export async function seedIfEmpty() {
 
   await seedMedia();
 
+  // Seed a handful of comments so the public reader looks alive on first
+  // boot (issue #89). Spread across two stories so the empty state is
+  // also exercised on the rest.
+  await db.comments.bulkPut([
+    {
+      id: "cmt_seed_01",
+      articleId: "s01",
+      memberId: "m_5102",
+      memberName: "Hana Watanabe",
+      text: "The 'one small thing' framing landed for me. I've been overcomplicating mornings.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
+    },
+    {
+      id: "cmt_seed_02",
+      articleId: "s01",
+      memberId: "m_6033",
+      memberName: "Renji Park",
+      text: "Reading this on the train; somehow it slowed the train down too.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+    },
+    {
+      id: "cmt_seed_03",
+      articleId: "s04",
+      memberId: "m_7188",
+      memberName: "Aiko Sato",
+      text: "We've kept up the after-dinner walk for three weeks now. Ten minutes is enough.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
+    },
+  ]);
+
   localStorage.setItem(SEED_KEY, "1");
 }
 
