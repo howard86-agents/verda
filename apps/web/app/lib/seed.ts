@@ -3,9 +3,12 @@ import {
   GROWTH_LEVELS,
   MEMBER,
   SOCIAL,
+  type Social,
   STORIES,
 } from "@verda/data";
 import {
+  type Article,
+  type ArticleContributor,
   db,
   GROWTH_CONFIG_DEFAULT_ID,
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
@@ -24,6 +27,86 @@ const PUBLIC_IMAGES = [
   { path: "/img/social/r02.webp", filename: "r02.webp" },
   { path: "/img/social/r03.webp", filename: "r03.webp" },
 ];
+
+/**
+ * Per-item attribution + body seed for SOCIAL records (issue #75).
+ *
+ * The public `/readers/[slug]` view reads `bodyJson`, `src`, `sourceUrl`,
+ * `license`, and `contributors` directly off the article record so each
+ * submission/repost/remix renders its own authored content rather than a
+ * shared hardcoded mockup. Keys are SOCIAL ids (`r01` … `r03`).
+ */
+const READER_ATTRIBUTION: Record<
+  string,
+  {
+    body: string;
+    contributors: ArticleContributor[];
+    license: string;
+    sourceUrl: string;
+  }
+> = {
+  r01: {
+    body: "My mother boiled the turmeric for twenty-three minutes. She said she had stopped counting; the kitchen timer was broken. Twenty-three is now the number I keep.",
+    sourceUrl: "https://instagram.com/maya.cooks",
+    license: "Reader submission · used with permission",
+    contributors: [
+      { name: "@maya.cooks", role: "recipe + photograph", color: "#c87a3a" },
+    ],
+  },
+  r02: {
+    body: "Behind the stationery shop on Aoyama-dori, a tiny garden lives in salvaged pots. The owner waters everything by hand on Sundays. We asked, she said yes, we reposted.",
+    sourceUrl: "https://instagram.com/leaf",
+    license: "Reposted with permission · CC BY-NC 4.0",
+    contributors: [
+      { name: "@leaf", role: "original photograph", color: "#4a6b48" },
+    ],
+  },
+  r03: {
+    body: "Three readers sent us their May field notes. Studio H rearranged them into one continuous piece, with the originals lightly edited and clearly attributed.",
+    sourceUrl: "https://studioh.tw/field-notes",
+    license: "CC BY-NC 4.0",
+    contributors: [
+      { name: "@maya.cooks", role: "turmeric porridge note", color: "#c87a3a" },
+      { name: "@a.field", role: "two morning walks", color: "#4a6b48" },
+      { name: "@yu.papers", role: "three handwritten cards", color: "#9a4a68" },
+    ],
+  },
+};
+
+function readerSeedFor(s: Social): Article {
+  const attr = READER_ATTRIBUTION[s.id];
+  const bodyText =
+    attr?.body ?? `${s.title} — sent in by ${s.src} on ${s.date}.`;
+  return {
+    id: s.id,
+    slug: s.slug,
+    kind: s.kind,
+    cat: "",
+    tag: s.tag,
+    title: s.title,
+    jp: "",
+    sum: "",
+    img: s.img,
+    imagePrompt: s.imagePrompt,
+    imageSeed: s.imageSeed,
+    read: 0,
+    date: s.date,
+    author: "",
+    src: s.src,
+    sourceUrl: attr?.sourceUrl,
+    license: attr?.license,
+    contributors: attr?.contributors,
+    bodyJson: JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: bodyText }],
+        },
+      ],
+    }),
+  };
+}
 
 async function seedMedia() {
   const count = await db.mediaAssets.count();
@@ -97,25 +180,7 @@ export async function seedIfEmpty() {
     }))
   );
 
-  await db.articles.bulkPut(
-    SOCIAL.map((s) => ({
-      id: s.id,
-      slug: s.slug,
-      kind: s.kind,
-      cat: "",
-      tag: s.tag,
-      title: s.title,
-      jp: "",
-      sum: "",
-      img: s.img,
-      imagePrompt: s.imagePrompt,
-      imageSeed: s.imageSeed,
-      read: 0,
-      date: s.date,
-      author: "",
-      src: s.src,
-    }))
-  );
+  await db.articles.bulkPut(SOCIAL.map((s) => readerSeedFor(s)));
 
   await db.growthRules.bulkPut(
     GROWTH_LEVELS.map((g) => ({

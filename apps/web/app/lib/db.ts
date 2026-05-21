@@ -1,9 +1,20 @@
 import Dexie, { type EntityTable } from "dexie";
 
+export interface ArticleContributor {
+  /** Optional accent color used to tint contributor list entries. */
+  color?: string;
+  /** Display name (e.g. handle, byline). */
+  name: string;
+  /** Short note describing what the contributor provided. */
+  role?: string;
+}
+
 export interface Article {
   author: string;
   bodyJson?: string;
   cat: string;
+  /** Optional list of contributors for reposts / remixes (issue #75). */
+  contributors?: ArticleContributor[];
   date: string;
   id: string;
   imagePrompt: string;
@@ -11,10 +22,15 @@ export interface Article {
   img: string;
   jp: string;
   kind: string;
+  /** Optional license label (e.g. "CC BY-NC 4.0"). */
+  license?: string;
   publishedAt?: string;
   read: number;
   scheduledAt?: string;
   slug: string;
+  /** Public URL for the original source. */
+  sourceUrl?: string;
+  /** Original source label (handle, publication, …). */
   src?: string;
   status?: string;
   sum: string;
