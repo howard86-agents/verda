@@ -12,6 +12,7 @@ export interface Article {
   kind: string;
   read: number;
   slug: string;
+  src?: string;
   sum: string;
   tag: string;
   title: string;

@@ -1,4 +1,4 @@
-import { GROWTH_LEVELS, STORIES } from "@verda/data";
+import { GROWTH_LEVELS, SOCIAL, STORIES } from "@verda/data";
 import { db } from "./db";
 
 const SEED_KEY = "verda.seeded";
@@ -28,6 +28,26 @@ export async function seedIfEmpty() {
       read: s.read,
       date: s.date,
       author: s.author,
+    }))
+  );
+
+  await db.articles.bulkPut(
+    SOCIAL.map((s) => ({
+      id: s.id,
+      slug: s.slug,
+      kind: s.kind,
+      cat: "",
+      tag: s.tag,
+      title: s.title,
+      jp: "",
+      sum: "",
+      img: s.img,
+      imagePrompt: s.imagePrompt,
+      imageSeed: s.imageSeed,
+      read: 0,
+      date: s.date,
+      author: "",
+      src: s.src,
     }))
   );
 
