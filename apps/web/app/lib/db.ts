@@ -23,10 +23,23 @@ export interface Article {
 }
 
 export interface Member {
+  deletedAt?: string;
   email: string;
   id: string;
   joined: string;
   name: string;
+}
+
+export interface AuditLog {
+  action: "point_adjust" | "member_delete";
+  adminId: string;
+  amount?: number;
+  balanceAfter?: number;
+  balanceBefore?: number;
+  createdAt: string;
+  id?: number;
+  memberId: string;
+  reason: string;
 }
 
 export interface BehaviorLog {
@@ -133,6 +146,7 @@ const db = new Dexie("verda") as Dexie & {
   growthConfig: EntityTable<GrowthConfig, "id">;
   mediaAssets: EntityTable<MediaAsset, "id">;
   articleVersions: EntityTable<ArticleVersion, "id">;
+  auditLog: EntityTable<AuditLog, "id">;
 };
 
 db.version(1).stores({
@@ -151,10 +165,15 @@ db.version(1).stores({
   articleVersions: "id, articleId, timestamp",
 });
 
-// v2 — additive: introduces the growthConfig table for issue #30.
-// Cap value is storage-only; enforcement lives in #67.
+// v2 — additive on the v1 schema. Combines:
+//   - issue #30: growthConfig table (growth-item quantity cap, storage-only;
+//     enforcement lives in #67)
+//   - issue #31: auditLog table (point_adjust + member_delete trail) and a
+//     deletedAt index on members so the active list can filter on it
 db.version(2).stores({
   growthConfig: "id",
+  members: "id, email, deletedAt",
+  auditLog: "++id, memberId, action, createdAt",
 });
 
 export { db };

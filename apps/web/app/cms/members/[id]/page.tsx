@@ -1,375 +1,653 @@
-import { MEMBER } from "@verda/data";
+"use client";
+
+// CMS · Member detail. Live balance from pointLedger, growth from
+// growthItems, saved articles from collections, behavior log from
+// behaviorLogs, and the per-member audit trail. Customer-service /
+// admin can apply manual point adjustments (writes pointLedger +
+// auditLog with before/after) and admin can soft-delete the member.
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useState } from "react";
 import { CmsShell } from "@/_components/cms-shell";
 import { IconDrop } from "@/_components/glyphs";
 import { StatSlab } from "@/_components/stat-slab";
+import { can, useCmsAuth } from "@/lib/cms-auth";
+import type { Article, AuditLog, BehaviorLog, PointLedger } from "@/lib/db";
 
-export function generateStaticParams() {
-  return [{ id: "m_4421" }];
+interface MemberPayload {
+  auditLog: AuditLog[];
+  balance: number;
+  behaviorLogs: BehaviorLog[];
+  collections: Article[];
+  growth: {
+    currentJp: string;
+    currentName: string;
+    level: number;
+    nextName: string | null;
+    nextThreshold: number | null;
+    nutrients: number;
+  };
+  ledger: PointLedger[];
+  member: {
+    deletedAt: string | null;
+    email: string;
+    id: string;
+    joined: string;
+    name: string;
+  };
 }
 
-interface LogRow {
-  amt: string;
-  d: string;
-  ev: string;
-  ip: string;
-  src: string;
-  warn?: boolean;
-  when: string;
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return iso;
+  }
+  return d.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-const LOG: LogRow[] = [
-  {
-    ev: "story_read_complete",
-    d: "Letters to a slower year",
-    amt: "+10",
-    when: "today · 14:08",
-    src: "web",
-    ip: "114.42.x.x",
-  },
-  {
-    ev: "daily_check_in",
-    d: "May 20 check-in",
-    amt: "+5",
-    when: "today · 09:02",
-    src: "webview",
-    ip: "118.166.x.x",
-  },
-  {
-    ev: "login_91app",
-    d: "SSO via 91APP token",
-    amt: "—",
-    when: "today · 09:01",
-    src: "webview",
-    ip: "118.166.x.x",
-  },
-  {
-    ev: "story_collect",
-    d: "Reading the soil",
-    amt: "+2",
-    when: "yesterday",
-    src: "web",
-    ip: "114.42.x.x",
-  },
-  {
-    ev: "story_read_complete",
-    d: "A spring bowl in 5 colors",
-    amt: "+10",
-    when: "May 16",
-    src: "web",
-    ip: "114.42.x.x",
-  },
-  {
-    ev: "daily_check_in",
-    d: "May 16 check-in",
-    amt: "+5",
-    when: "May 16",
-    src: "webview",
-    ip: "118.166.x.x",
-  },
-  {
-    ev: "reward_throttled",
-    d: "Duplicate read attempt — ignored",
-    amt: "+0",
-    when: "May 15",
-    src: "web",
-    ip: "114.42.x.x",
-    warn: true,
-  },
-];
-
-interface AuditRow {
-  amt: string;
-  when: string;
-  who: string;
-  why: string;
+function auditAmountLabel(a: AuditLog): string {
+  if (a.action === "member_delete") {
+    return "DEL";
+  }
+  if (a.amount == null) {
+    return "";
+  }
+  return a.amount >= 0 ? `+${a.amount}` : String(a.amount);
 }
 
-const AUDIT: AuditRow[] = [
-  { who: "H. Tsai", amt: "+25", why: "CS goodwill · #2018", when: "2 min ago" },
-  {
-    who: "H. Tsai",
-    amt: "+0",
-    why: "Reviewed throttling event",
-    when: "today 11:02",
-  },
-  { who: "sys", amt: "−5", why: "Auto-rollback — duplicate", when: "May 15" },
-];
-
-export default async function CmsMemberPage({
-  params,
+function PointAdjustForm({
+  canAdjust,
+  memberId,
+  balance,
+  onSuccess,
 }: {
-  params: Promise<{ id: string }>;
+  canAdjust: boolean;
+  memberId: string;
+  balance: number;
+  onSuccess: () => void;
 }) {
-  await params;
+  const { role } = useCmsAuth();
+  const [direction, setDirection] = useState<"add" | "deduct">("add");
+  const [amount, setAmount] = useState("25");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const adjust = useMutation({
+    mutationFn: async () => {
+      const numeric = Number(amount);
+      if (!Number.isFinite(numeric) || numeric <= 0) {
+        throw new Error("Enter a positive number");
+      }
+      if (!reason.trim()) {
+        throw new Error("Reason is required");
+      }
+      const signed = direction === "add" ? numeric : -numeric;
+      const res = await fetch(`/api/cms/members/${memberId}/point-adjust`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-cms-role": role,
+        },
+        body: JSON.stringify({ amount: signed, reason: reason.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Adjustment failed (HTTP ${res.status})`);
+      }
+      return (await res.json()) as {
+        balanceAfter: number;
+        balanceBefore: number;
+      };
+    },
+    onSuccess: (result) => {
+      setError(null);
+      setFeedback(`Adjusted: ${result.balanceBefore} → ${result.balanceAfter}`);
+      setReason("");
+      onSuccess();
+    },
+    onError: (e: Error) => {
+      setFeedback(null);
+      setError(e.message);
+    },
+  });
+
+  if (!canAdjust) {
+    return (
+      <div className="border border-line bg-paper p-[18px]">
+        <div className="font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
+          Manual adjustment
+          <span className="ml-2 font-display text-[12px] text-muted normal-case italic tracking-normal">
+            手動調整
+          </span>
+        </div>
+        <p className="mt-3 font-mono text-[11px] text-vermilion uppercase tracking-[0.14em]">
+          Customer-service or admin role required.
+        </p>
+      </div>
+    );
+  }
+
+  const numericAmount = Number(amount);
+  const signed = direction === "add" ? numericAmount : -numericAmount;
+  const projected = Number.isFinite(numericAmount) ? balance + signed : balance;
+
+  return (
+    <div className="border border-ink bg-paper p-[18px]">
+      <div className="flex items-baseline gap-2 font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
+        Manual adjustment
+        <span className="font-display text-[12px] text-muted normal-case italic tracking-normal">
+          手動調整
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-[10px]">
+        <button
+          aria-pressed={direction === "add"}
+          className={`border py-2 font-mono text-[11px] uppercase tracking-[0.14em] ${
+            direction === "add"
+              ? "border-vermilion bg-vermilion/10 text-vermilion"
+              : "border-line bg-paper text-muted"
+          }`}
+          onClick={() => setDirection("add")}
+          type="button"
+        >
+          + Add
+        </button>
+        <button
+          aria-pressed={direction === "deduct"}
+          className={`border py-2 font-mono text-[11px] uppercase tracking-[0.14em] ${
+            direction === "deduct"
+              ? "border-ink bg-ink text-cream"
+              : "border-line bg-paper text-muted"
+          }`}
+          onClick={() => setDirection("deduct")}
+          type="button"
+        >
+          − Deduct
+        </button>
+      </div>
+      <div className="mt-[14px] flex items-baseline gap-2 border border-line bg-paper-alt px-3 py-[10px]">
+        <label
+          className="font-display font-medium text-[28px] text-vermilion"
+          htmlFor="adjust-amount"
+        >
+          {direction === "add" ? "+" : "−"}
+        </label>
+        <input
+          className="w-16 border-0 bg-transparent font-display font-medium text-[28px] text-vermilion outline-none"
+          id="adjust-amount"
+          inputMode="numeric"
+          min="1"
+          onChange={(e) => setAmount(e.target.value)}
+          type="number"
+          value={amount}
+        />
+        <span className="font-mono text-[10.5px] text-muted uppercase tracking-[0.12em]">
+          nutrients · 滋養
+        </span>
+        <span className="ml-auto font-mono text-[10px] text-muted tracking-[0.1em]">
+          NEW BAL: {projected}
+        </span>
+      </div>
+      <div className="mt-[10px]">
+        <label
+          className="mb-1 block font-mono text-[9.5px] text-muted uppercase tracking-[0.18em]"
+          htmlFor="adjust-reason"
+        >
+          Reason · 理由 (required)
+        </label>
+        <textarea
+          className="w-full resize-none border border-ink bg-white px-[10px] py-2 font-sans text-[13px] text-ink"
+          id="adjust-reason"
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Ticket #, customer notes, etc."
+          rows={2}
+          value={reason}
+        />
+      </div>
+      {error && (
+        <div className="mt-2 font-mono text-[10.5px] text-vermilion uppercase tracking-[0.14em]">
+          {error}
+        </div>
+      )}
+      {feedback && (
+        <div className="mt-2 font-mono text-[10.5px] text-ink uppercase tracking-[0.14em]">
+          {feedback}
+        </div>
+      )}
+      <button
+        className="mt-[14px] w-full bg-vermilion py-[10px] font-mono text-[11px] text-cream uppercase tracking-[0.18em] disabled:opacity-50"
+        disabled={adjust.isPending}
+        onClick={() => adjust.mutate()}
+        type="button"
+      >
+        {adjust.isPending ? "Applying…" : "Apply & sign audit"}
+      </button>
+      <div className="mt-[10px] font-mono text-[9.5px] text-muted uppercase tracking-[0.06em]">
+        Logged as ledger txn + audit row · cannot be deleted
+      </div>
+    </div>
+  );
+}
+
+function RemoveMemberButton({
+  canDelete,
+  memberId,
+  isDeleted,
+  onSuccess,
+}: {
+  canDelete: boolean;
+  memberId: string;
+  isDeleted: boolean;
+  onSuccess: () => void;
+}) {
+  const { role } = useCmsAuth();
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const remove = useMutation({
+    mutationFn: async () => {
+      // biome-ignore lint/suspicious/noAlert: dev-only CMS tool
+      const reason = window.prompt(
+        "Reason for removal (required, recorded in audit log):"
+      );
+      if (!reason?.trim()) {
+        throw new Error("Cancelled — a reason is required");
+      }
+      const res = await fetch(
+        `/api/cms/members/${memberId}?reason=${encodeURIComponent(reason.trim())}`,
+        {
+          method: "DELETE",
+          headers: { "x-cms-role": role },
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Delete failed (HTTP ${res.status})`);
+      }
+      return (await res.json()) as { deletedAt: string };
+    },
+    onSuccess: () => {
+      setFeedback("Member soft-deleted");
+      onSuccess();
+    },
+    onError: (e: Error) => setFeedback(e.message),
+  });
+
+  if (!canDelete) {
+    return null;
+  }
+  if (isDeleted) {
+    return (
+      <span className="border border-line bg-paper px-3 py-2 font-mono text-[11px] text-muted uppercase tracking-[0.16em]">
+        Already removed
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <button
+        className="border border-vermilion bg-paper px-3 py-2 font-mono text-[11px] text-vermilion uppercase tracking-[0.16em] disabled:opacity-50"
+        disabled={remove.isPending}
+        onClick={() => remove.mutate()}
+        type="button"
+      >
+        {remove.isPending ? "Removing…" : "Remove member"}
+      </button>
+      {feedback && (
+        <span className="font-mono text-[10px] text-muted uppercase tracking-[0.12em]">
+          {feedback}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export default function CmsMemberPage() {
+  const { role } = useCmsAuth();
+  const qc = useQueryClient();
+  const routeParams = useParams<{ id: string }>();
+  const memberId = routeParams.id;
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["cms-member", memberId],
+    queryFn: async () => {
+      const res = await fetch(`/api/cms/members/${memberId}`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error("Member not found");
+        }
+        throw new Error(`Failed to load member (HTTP ${res.status})`);
+      }
+      return (await res.json()) as MemberPayload;
+    },
+  });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["cms-member", memberId] });
+    qc.invalidateQueries({ queryKey: ["cms-members"] });
+  };
+
+  const canAdjust = can("point_adjust", role);
+  const canDelete = can("member_delete", role);
+
+  if (isLoading) {
+    return (
+      <CmsShell active="members" breadcrumb="Members · 会員">
+        <p className="px-8 pt-7 font-mono text-[12px] text-muted uppercase tracking-[0.14em]">
+          Loading…
+        </p>
+      </CmsShell>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <CmsShell active="members" breadcrumb="Members · 会員">
+        <div className="px-8 pt-7">
+          <p className="font-mono text-[12px] text-vermilion uppercase tracking-[0.14em]">
+            {error instanceof Error ? error.message : "Failed to load member"}
+          </p>
+          <Link
+            className="mt-4 inline-block border border-line bg-paper px-3 py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
+            href="/cms/members"
+          >
+            ← Back to members
+          </Link>
+        </div>
+      </CmsShell>
+    );
+  }
+
+  const {
+    member,
+    balance,
+    growth,
+    ledger,
+    behaviorLogs,
+    collections,
+    auditLog,
+  } = data;
+  const initial = member.name.charAt(0).toUpperCase();
+  const isDeleted = !!member.deletedAt;
 
   return (
     <CmsShell
       actions={
-        <>
-          <button
-            className="border border-line bg-paper px-3 py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
-            type="button"
-          >
-            Export CSV
-          </button>
-          <button
-            className="border border-line bg-paper px-3 py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
-            type="button"
-          >
-            Audit log
-          </button>
-          <button
-            className="bg-vermilion px-[14px] py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em]"
-            type="button"
-          >
-            Adjust nutrients
-          </button>
-        </>
+        <RemoveMemberButton
+          canDelete={canDelete}
+          isDeleted={isDeleted}
+          memberId={member.id}
+          onSuccess={refresh}
+        />
       }
       active="members"
-      breadcrumb={`Members / ${MEMBER.name}`}
+      breadcrumb={`Members / ${member.name}`}
     >
       <section className="px-8 pt-6 max-[860px]:px-5">
-        {/* Member header */}
+        {/* Header */}
         <div className="grid grid-cols-[88px_1fr_auto] items-center gap-[22px] max-[700px]:grid-cols-1">
           <div className="flex size-[88px] items-center justify-center bg-ink font-display font-medium text-[38px] text-cream">
-            {MEMBER.initial}
+            {initial}
           </div>
           <div>
             <div className="font-mono text-[10px] text-muted uppercase tracking-[0.22em]">
-              91APP {MEMBER.memberId} · {MEMBER.joined}
+              {member.id} · {member.joined}
             </div>
             <h1 className="mt-1 mb-0 font-display font-medium text-[36px] leading-none tracking-[-0.015em]">
-              {MEMBER.name}
+              {member.name}
               <span className="text-vermilion">.</span>
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-[14px] font-mono text-[10.5px] text-muted uppercase tracking-[0.1em]">
               <span className="flex items-center gap-[6px]">
-                <span className="size-[6px] bg-vermilion" />
-                ACTIVE · LAST OPEN 14:08 TODAY
+                <span
+                  className={`size-[6px] ${isDeleted ? "bg-muted" : "bg-vermilion"}`}
+                />
+                {isDeleted ? "REMOVED" : "ACTIVE"}
               </span>
               <span>·</span>
-              <span>{MEMBER.email}</span>
+              <span>{member.email}</span>
               <span>·</span>
-              <span>Lv 0{MEMBER.level} · Sprout</span>
+              <span>
+                Lv {String(growth.level).padStart(2, "0")} ·{" "}
+                {growth.currentName}
+              </span>
+              {isDeleted && member.deletedAt && (
+                <>
+                  <span>·</span>
+                  <span className="text-vermilion">
+                    Removed {formatTime(member.deletedAt)}
+                  </span>
+                </>
+              )}
             </div>
           </div>
-          <div className="flex gap-[10px]">
-            <button
-              className="border border-line bg-paper px-3 py-2 font-mono text-[11px] text-ink uppercase tracking-[0.14em]"
-              type="button"
-            >
-              Email
-            </button>
-            <button
-              className="border border-line bg-paper px-3 py-2 font-mono text-[11px] text-ink uppercase tracking-[0.14em]"
-              type="button"
-            >
-              Open in 91APP
-            </button>
-          </div>
+          <Link
+            className="border border-line bg-paper px-3 py-2 font-mono text-[11px] text-ink uppercase tracking-[0.14em] max-[700px]:justify-self-start"
+            href="/cms/members"
+          >
+            ← Members
+          </Link>
         </div>
 
-        {/* Stat slab row */}
+        {/* Stats */}
         <div className="mt-6 grid grid-cols-5 border border-ink max-[700px]:grid-cols-2">
-          <StatSlab
-            accent
-            en="Nutrients"
-            jp="滋養"
-            n={String(MEMBER.nutrients)}
-          />
-          <StatSlab divider en="Read" jp="読了" n={String(MEMBER.read)} />
-          <StatSlab divider en="Saved" jp="保存" n={String(MEMBER.saved)} />
-          <StatSlab divider en="Level" jp="芽" n={`0${MEMBER.level}`} />
+          <StatSlab accent en="Nutrients" jp="滋養" n={String(balance)} />
           <StatSlab
             divider
-            en="Redeemed"
-            jp="未引換"
-            n={String(MEMBER.redeemed)}
+            en="Growth"
+            jp={growth.currentJp}
+            n={`Lv ${String(growth.level).padStart(2, "0")}`}
+          />
+          <StatSlab
+            divider
+            en="Saved"
+            jp="保存"
+            n={String(collections.length)}
+          />
+          <StatSlab
+            divider
+            en="Behaviour"
+            jp="行動"
+            n={String(behaviorLogs.length)}
+          />
+          <StatSlab
+            divider
+            en="Next"
+            jp={growth.nextName ?? "—"}
+            n={
+              growth.nextThreshold == null ? "—" : String(growth.nextThreshold)
+            }
           />
         </div>
 
         {/* Main grid */}
         <div className="mt-7 grid grid-cols-[1.4fr_1fr] gap-6 max-[1000px]:grid-cols-1">
-          {/* Behaviour log */}
-          <div>
-            <div className="flex items-baseline justify-between border-ink border-b pb-2">
-              <div>
-                <div className="font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
-                  Behaviour log
+          {/* Behaviour log + collection + ledger */}
+          <div className="flex flex-col gap-7">
+            {/* Behaviour log */}
+            <div>
+              <div className="flex items-baseline justify-between border-ink border-b pb-2">
+                <div>
+                  <div className="font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
+                    Behaviour log
+                  </div>
+                  <div className="mt-[2px] font-display text-[18px] text-muted italic">
+                    行動の記録
+                  </div>
                 </div>
-                <div className="mt-[2px] font-display text-[18px] text-muted italic">
-                  行動の記録
+                <div className="font-mono text-[10px] text-muted uppercase tracking-[0.14em]">
+                  {behaviorLogs.length} events
                 </div>
               </div>
-              <div className="flex gap-3 font-mono text-[11px] text-muted uppercase tracking-[0.14em]">
-                <span className="border-vermilion border-b-2 pb-1 text-ink">
-                  All
-                </span>
-                <span>Rewards</span>
-                <span>Logins</span>
-                <span>Errors</span>
+              {behaviorLogs.length === 0 && (
+                <p className="py-6 font-mono text-[11px] text-muted uppercase tracking-[0.14em]">
+                  No behaviour recorded yet.
+                </p>
+              )}
+              <div className="overflow-x-auto">
+                <div className="min-w-[480px]">
+                  {behaviorLogs.map((b) => (
+                    <div
+                      className="grid grid-cols-[160px_1fr_140px] items-center gap-[14px] border-line border-b py-3 font-sans text-[13px]"
+                      key={`${b.createdAt}-${b.action}-${b.articleId ?? ""}`}
+                    >
+                      <span className="font-mono text-[10px] text-ink uppercase tracking-[0.12em]">
+                        {b.action}
+                      </span>
+                      <span className="text-ink-soft">
+                        {b.articleId ?? "—"}
+                      </span>
+                      <span className="font-mono text-[10.5px] text-muted tracking-[0.04em]">
+                        {formatTime(b.createdAt)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <div className="min-w-[480px]">
-                {LOG.map((r) => (
-                  <div
-                    className="grid grid-cols-[56px_160px_1fr_80px_80px] items-center gap-[14px] border-line border-b py-3 font-sans text-[13px]"
-                    key={`${r.when}-${r.ev}`}
-                  >
-                    <span
-                      className={`flex items-center gap-1 font-display font-medium text-[16px] ${
-                        r.amt === "+0" ? "text-muted" : "text-vermilion"
-                      }`}
-                    >
-                      {r.amt !== "+0" && (
-                        <span className="inline-flex text-vermilion">
-                          <IconDrop />
-                        </span>
-                      )}
-                      {r.amt}
-                    </span>
-                    <span
-                      className={`font-mono text-[10px] uppercase tracking-[0.12em] ${
-                        r.warn ? "text-vermilion" : "text-ink"
-                      }`}
-                    >
-                      {r.ev}
-                    </span>
-                    <span className="text-ink-soft">{r.d}</span>
-                    <span className="font-mono text-[10.5px] text-muted uppercase tracking-[0.08em]">
-                      {r.src}
-                    </span>
-                    <span className="font-mono text-[10.5px] text-muted tracking-[0.04em]">
-                      {r.when}
-                    </span>
+            {/* Saved collection */}
+            <div>
+              <div className="flex items-baseline justify-between border-ink border-b pb-2">
+                <div>
+                  <div className="font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
+                    Saved · 保存
                   </div>
-                ))}
+                  <div className="mt-[2px] font-display text-[18px] text-muted italic">
+                    コレクション
+                  </div>
+                </div>
+                <div className="font-mono text-[10px] text-muted uppercase tracking-[0.14em]">
+                  {collections.length} articles
+                </div>
               </div>
+              {collections.length === 0 && (
+                <p className="py-6 font-mono text-[11px] text-muted uppercase tracking-[0.14em]">
+                  No saved articles.
+                </p>
+              )}
+              {collections.map((a) => (
+                <div
+                  className="grid grid-cols-[1fr_120px_80px] items-center gap-[14px] border-line border-b py-3 font-sans text-[13px]"
+                  key={a.id}
+                >
+                  <span className="text-ink">{a.title}</span>
+                  <span className="font-mono text-[10px] text-muted uppercase tracking-[0.1em]">
+                    {a.cat}
+                  </span>
+                  <span className="font-mono text-[10.5px] text-muted tracking-[0.04em]">
+                    {a.date}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Point ledger */}
+            <div>
+              <div className="flex items-baseline justify-between border-ink border-b pb-2">
+                <div>
+                  <div className="font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
+                    Point ledger
+                  </div>
+                  <div className="mt-[2px] font-display text-[18px] text-muted italic">
+                    ポイント記録
+                  </div>
+                </div>
+                <div className="font-mono text-[10px] text-muted uppercase tracking-[0.14em]">
+                  {ledger.length} entries
+                </div>
+              </div>
+              {ledger.length === 0 && (
+                <p className="py-6 font-mono text-[11px] text-muted uppercase tracking-[0.14em]">
+                  No ledger entries yet.
+                </p>
+              )}
+              {ledger.map((l) => (
+                <div
+                  className="grid grid-cols-[80px_1fr_80px_140px] items-center gap-[14px] border-line border-b py-3 font-sans text-[13px]"
+                  key={`${l.createdAt}-${l.amount}-${l.id ?? ""}`}
+                >
+                  <span
+                    className={`flex items-center gap-1 font-display font-medium text-[16px] ${l.amount >= 0 ? "text-vermilion" : "text-muted"}`}
+                  >
+                    {l.amount >= 0 && (
+                      <span className="inline-flex text-vermilion">
+                        <IconDrop />
+                      </span>
+                    )}
+                    {l.amount >= 0 ? `+${l.amount}` : l.amount}
+                  </span>
+                  <span className="text-ink-soft">{l.reason}</span>
+                  <span className="font-mono text-[10.5px] text-muted tracking-[0.04em]">
+                    bal {l.balanceAfter}
+                  </span>
+                  <span className="font-mono text-[10.5px] text-muted tracking-[0.04em]">
+                    {formatTime(l.createdAt)}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right column — adjustment + audit + integration */}
+          {/* Right column — adjust + audit */}
           <div className="flex flex-col gap-5">
-            {/* Manual adjustment slab */}
-            <div className="border border-ink bg-paper p-[18px]">
-              <div className="flex items-baseline gap-2 font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
-                Manual adjustment
-                <span className="font-display text-[12px] text-muted normal-case italic tracking-normal">
-                  手動調整
-                </span>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-[10px]">
-                <button
-                  className="border border-line bg-paper py-2 font-mono text-[11px] text-vermilion uppercase tracking-[0.14em]"
-                  type="button"
-                >
-                  + Add
-                </button>
-                <button
-                  className="border border-line bg-paper py-2 font-mono text-[11px] text-muted uppercase tracking-[0.14em]"
-                  type="button"
-                >
-                  − Deduct
-                </button>
-              </div>
-              <div className="mt-[14px] flex items-baseline gap-2 border border-line bg-paper-alt px-3 py-[10px]">
-                <label
-                  className="font-display font-medium text-[28px] text-vermilion"
-                  htmlFor="adjust-amount"
-                >
-                  +
-                </label>
-                <input
-                  className="w-12 border-0 bg-transparent font-display font-medium text-[28px] text-vermilion outline-none"
-                  defaultValue="25"
-                  id="adjust-amount"
-                  inputMode="numeric"
-                />
-                <span className="font-mono text-[10.5px] text-muted uppercase tracking-[0.12em]">
-                  nutrients · 滋養
-                </span>
-                <span className="ml-auto font-mono text-[10px] text-muted tracking-[0.1em]">
-                  NEW BAL: 112
-                </span>
-              </div>
-              <div className="mt-[10px]">
-                <label
-                  className="mb-1 block font-mono text-[9.5px] text-muted uppercase tracking-[0.18em]"
-                  htmlFor="adjust-reason"
-                >
-                  Reason · 理由 (required)
-                </label>
-                <textarea
-                  className="w-full resize-none border border-ink bg-white px-[10px] py-2 font-sans text-[13px] text-ink"
-                  defaultValue="CS goodwill — refund for 14 May reward not credited (ticket #2018)."
-                  id="adjust-reason"
-                  rows={2}
-                />
-              </div>
-              <button
-                className="mt-[14px] w-full bg-vermilion py-[10px] font-mono text-[11px] text-cream uppercase tracking-[0.18em]"
-                type="button"
-              >
-                Apply &amp; sign audit
-              </button>
-              <div className="mt-[10px] font-mono text-[9.5px] text-muted uppercase tracking-[0.06em]">
-                Logged as ledger txn + audit row · cannot be deleted
-              </div>
-            </div>
+            <PointAdjustForm
+              balance={balance}
+              canAdjust={canAdjust && !isDeleted}
+              memberId={member.id}
+              onSuccess={refresh}
+            />
 
-            {/* Recent audit */}
             <div>
               <div className="flex items-baseline justify-between border-ink border-b pb-2">
                 <div className="font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
                   Audit · 監査
                 </div>
                 <div className="font-mono text-[10px] text-muted uppercase tracking-[0.14em]">
-                  last 30d
+                  {auditLog.length} entries
                 </div>
               </div>
-              {AUDIT.map((a) => (
+              {auditLog.length === 0 && (
+                <p className="py-6 font-mono text-[11px] text-muted uppercase tracking-[0.14em]">
+                  No audit entries yet.
+                </p>
+              )}
+              {auditLog.map((a) => (
                 <div
                   className="grid grid-cols-[60px_1fr_auto] gap-[10px] border-line border-b py-[10px]"
-                  key={`${a.when}-${a.why}`}
+                  key={`${a.createdAt}-${a.id ?? a.action}`}
                 >
                   <span
-                    className={`font-display font-medium text-[16px] ${
-                      a.amt.startsWith("+") ? "text-vermilion" : "text-muted"
-                    }`}
+                    className={`font-display font-medium text-[16px] ${a.action === "member_delete" ? "text-muted" : "text-vermilion"}`}
                   >
-                    {a.amt}
+                    {auditAmountLabel(a)}
                   </span>
                   <div>
-                    <div className="font-sans text-[13px]">{a.why}</div>
+                    <div className="font-sans text-[13px]">{a.reason}</div>
                     <div className="mt-[2px] font-mono text-[10px] text-muted tracking-[0.06em]">
-                      by {a.who}
+                      by {a.adminId}
+                      {a.action === "point_adjust" &&
+                        a.balanceBefore != null &&
+                        a.balanceAfter != null && (
+                          <>
+                            {" · "}bal {a.balanceBefore} → {a.balanceAfter}
+                          </>
+                        )}
                     </div>
                   </div>
                   <span className="font-mono text-[10px] text-muted tracking-[0.06em]">
-                    {a.when}
+                    {formatTime(a.createdAt)}
                   </span>
                 </div>
               ))}
-            </div>
-
-            {/* Integration summary */}
-            <div className="border-vermilion border-l-4 bg-ink p-[18px] text-cream">
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-70">
-                Integration · 連携
-              </div>
-              <div className="mt-[10px] grid grid-cols-2 gap-[10px] font-mono text-[10.5px] tracking-[0.06em]">
-                <span className="text-white/60">91APP token</span>
-                <span>valid · 14:08</span>
-                <span className="text-white/60">WebView</span>
-                <span>iOS 17.4</span>
-                <span className="text-white/60">GA4 ID</span>
-                <span>G-VERDA1·MAIN</span>
-                <span className="text-white/60">Events / 30d</span>
-                <span>312 · 0 errors</span>
-              </div>
             </div>
           </div>
         </div>

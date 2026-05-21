@@ -21,9 +21,27 @@ export function balanceFromLedger(entries: PointLedger[]): number {
   return sorted[0].balanceAfter;
 }
 
+async function readState(memberId: string) {
+  const ledger = await db.pointLedger
+    .where("memberId")
+    .equals(memberId)
+    .toArray();
+  const balance = balanceFromLedger(ledger);
+  const growthRules = await db.growthRules.toArray();
+  return { balance, level: levelFor(balance, growthRules) };
+}
+
 /**
- * Award points for an action, enforcing the once-per-article guard for
- * per-article limit types. Returns { points, balance, level }.
+ * Award points for an action, consulting `rewardRules` live and enforcing
+ * the configured `limitType`:
+ *
+ * - `per-article`: at most one award per (member, action, articleId)
+ * - `per-day`:     at most one award per (member, action) per local-UTC day
+ * - `total`:       at most one award per (member, action) ever
+ * - `campaign`:    recognised but no built-in guard yet (caller-enforced)
+ *
+ * Disabled rules award 0 points without writing any ledger entry.
+ * Returns `{ points, balance, level }`.
  */
 export async function awardPoints(
   memberId: string,
@@ -32,7 +50,8 @@ export async function awardPoints(
 ): Promise<{ balance: number; level: number; points: number }> {
   const rule = await db.rewardRules.where("action").equals(action).first();
   if (!rule?.enabled) {
-    return { points: 0, balance: 0, level: 1 };
+    const state = await readState(memberId);
+    return { points: 0, ...state };
   }
 
   // Once-per-article guard
@@ -42,14 +61,37 @@ export async function awardPoints(
       .equals([memberId, action, articleId])
       .first();
     if (existing) {
-      // Already awarded — return current state without awarding again
-      const ledger = await db.pointLedger
-        .where("memberId")
-        .equals(memberId)
-        .toArray();
-      const balance = balanceFromLedger(ledger);
-      const rules = await db.growthRules.toArray();
-      return { points: 0, balance, level: levelFor(balance, rules) };
+      const state = await readState(memberId);
+      return { points: 0, ...state };
+    }
+  }
+
+  // Once-per-day guard
+  if (rule.limitType === "per-day") {
+    const today = new Date().toISOString().slice(0, 10);
+    const logs = await db.behaviorLogs
+      .where("memberId")
+      .equals(memberId)
+      .toArray();
+    const alreadyToday = logs.some(
+      (l) => l.action === action && l.createdAt.slice(0, 10) === today
+    );
+    if (alreadyToday) {
+      const state = await readState(memberId);
+      return { points: 0, ...state };
+    }
+  }
+
+  // Once-ever guard
+  if (rule.limitType === "total") {
+    const existing = await db.behaviorLogs
+      .where("memberId")
+      .equals(memberId)
+      .filter((l) => l.action === action)
+      .first();
+    if (existing) {
+      const state = await readState(memberId);
+      return { points: 0, ...state };
     }
   }
 
