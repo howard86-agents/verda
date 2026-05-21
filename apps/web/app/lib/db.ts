@@ -218,6 +218,23 @@ export interface ArticleVersion {
   timestamp: string;
 }
 
+/**
+ * A single earned badge for a member (issue #93).
+ *
+ * `memberBadges` is keyed on a unique `[memberId+badgeId]` compound so
+ * the storage layer rejects duplicate awards directly — the evaluator
+ * still checks before inserting, but the index keeps the model robust
+ * to concurrent calls.
+ */
+export interface MemberBadge {
+  /** Stable id from `BADGE_CATALOG` (e.g. "first_read"). */
+  badgeId: string;
+  /** ISO timestamp the badge was first awarded. */
+  earnedAt: string;
+  id?: number;
+  memberId: string;
+}
+
 const db = new Dexie("verda") as Dexie & {
   articles: EntityTable<Article, "id">;
   members: EntityTable<Member, "id">;
@@ -234,6 +251,7 @@ const db = new Dexie("verda") as Dexie & {
   articleVersions: EntityTable<ArticleVersion, "id">;
   auditLog: EntityTable<AuditLog, "id">;
   redemptions: EntityTable<Redemption, "id">;
+  memberBadges: EntityTable<MemberBadge, "id">;
 };
 
 db.version(1).stores({
@@ -295,6 +313,15 @@ db.version(3)
 // don't need their own indexes.
 db.version(4).stores({
   redemptions: "id, memberId, &growthItemId, createdAt",
+});
+
+// v5 — issue #93: badge / achievement awards.
+// Adds the `memberBadges` table keyed on a unique compound
+// `[memberId+badgeId]` so duplicate awards are rejected at the storage
+// layer too; the evaluator still checks before inserting, but the index
+// makes the model resilient to overlapping calls.
+db.version(5).stores({
+  memberBadges: "++id, memberId, badgeId, &[memberId+badgeId]",
 });
 
 export { db };
