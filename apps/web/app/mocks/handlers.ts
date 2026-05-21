@@ -17,6 +17,7 @@ import {
   mockRewardFor,
 } from "@/lib/redemption";
 import { allocateGrowthForMember, awardPoints, levelFor } from "@/lib/rewards";
+import { searchArticles } from "@/lib/search";
 import { computeStreak, isMaintainingStreak } from "@/lib/streak";
 
 async function handleRedemption(body: {
@@ -656,6 +657,41 @@ export const handlers = [
       return HttpResponse.json({ error: "Not found" }, { status: 404 });
     }
     return HttpResponse.json(article);
+  }),
+
+  // Full-text command-palette search (issue #99). Scans every
+  // published article (including reader-contributed kinds) across
+  // title, summary, tags, section, and the flattened bodyJson, and
+  // returns ranked hits — see lib/search.ts for the weights.
+  http.get("/api/search", async ({ request }) => {
+    const url = new URL(request.url);
+    const q = url.searchParams.get("q") ?? "";
+    const limit = Math.max(
+      1,
+      Math.min(20, Number(url.searchParams.get("limit") ?? "8"))
+    );
+    if (!q.trim()) {
+      return HttpResponse.json({ items: [], total: 0 });
+    }
+    const articles = await db.articles.toArray();
+    const published = articles.filter((a) => a.status === "published");
+    const hits = searchArticles(q, published, limit);
+    return HttpResponse.json({
+      items: hits.map((h) => ({
+        id: h.article.id,
+        slug: h.article.slug,
+        title: h.article.title,
+        sum: h.article.sum,
+        tag: h.article.tag,
+        kind: h.article.kind,
+        cat: h.article.cat,
+        section: h.article.section,
+        date: h.article.date,
+        score: h.score,
+        matchedFields: h.matchedFields,
+      })),
+      total: hits.length,
+    });
   }),
 
   http.get("/api/collections", async ({ request }) => {
