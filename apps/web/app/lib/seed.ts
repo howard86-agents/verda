@@ -1,4 +1,10 @@
-import { CATEGORIES, GROWTH_LEVELS, MEMBER, STORIES } from "@verda/data";
+import {
+  CATEGORIES,
+  GROWTH_LEVELS,
+  MEMBER,
+  SOCIAL,
+  STORIES,
+} from "@verda/data";
 import { db } from "./db";
 
 const SEED_KEY = "verda.seeded";
@@ -38,6 +44,26 @@ export async function seedIfEmpty() {
           },
         ],
       }),
+    }))
+  );
+
+  await db.articles.bulkPut(
+    SOCIAL.map((s) => ({
+      id: s.id,
+      slug: s.slug,
+      kind: s.kind,
+      cat: "",
+      tag: s.tag,
+      title: s.title,
+      jp: "",
+      sum: "",
+      img: s.img,
+      imagePrompt: s.imagePrompt,
+      imageSeed: s.imageSeed,
+      read: 0,
+      date: s.date,
+      author: "",
+      src: s.src,
     }))
   );
 
