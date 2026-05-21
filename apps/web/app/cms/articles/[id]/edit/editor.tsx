@@ -10,6 +10,7 @@ import NextLink from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CmsShell } from "@/_components/cms-shell";
 import { can, useCmsAuth } from "@/lib/cms-auth";
+import { track } from "@/lib/track";
 
 interface ArticleData {
   author: string;
@@ -18,6 +19,8 @@ interface ArticleData {
   id: string;
   jp: string;
   kind: string;
+  publishedAt?: string;
+  scheduledAt?: string;
   slug: string;
   status: string;
   tag: string;
@@ -176,6 +179,53 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
               {saving ? "Saving…" : "Save draft"}
             </button>
           )}
+          {articleId &&
+            can("publish", role) &&
+            article?.status !== "published" && (
+              <button
+                className="bg-vermilion px-[14px] py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em]"
+                onClick={async () => {
+                  const res = await fetch(
+                    `/api/cms/articles/${articleId}/publish`,
+                    {
+                      method: "POST",
+                      headers: { "x-cms-role": role },
+                    }
+                  );
+                  if (res.ok) {
+                    setArticle((a) => (a ? { ...a, status: "published" } : a));
+                    track("admin_article_publish", { articleId });
+                  }
+                }}
+                type="button"
+              >
+                Publish →
+              </button>
+            )}
+          {articleId &&
+            can("unpublish", role) &&
+            article?.status === "published" && (
+              <button
+                className="border border-ink bg-paper px-[14px] py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
+                onClick={async () => {
+                  const res = await fetch(
+                    `/api/cms/articles/${articleId}/unpublish`,
+                    {
+                      method: "POST",
+                      headers: { "x-cms-role": role },
+                    }
+                  );
+                  if (res.ok) {
+                    setArticle((a) =>
+                      a ? { ...a, status: "unpublished" } : a
+                    );
+                  }
+                }}
+                type="button"
+              >
+                Unpublish
+              </button>
+            )}
         </>
       }
       active="articles"
