@@ -1,7 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GROWTH_LEVELS } from "@verda/data";
+import { useState } from "react";
 import { AuthGate } from "@/_components/auth-gate";
 import { CheckInButton } from "@/_components/check-in-button";
 import { Eyebrow } from "@/_components/eyebrow";
@@ -14,9 +15,11 @@ import {
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
   type GrowthItem,
   type GrowthRule,
+  type Redemption,
 } from "@/lib/db";
 import { maxThresholdFor } from "@/lib/growth-allocation";
 import { levelFor } from "@/lib/rewards";
+import { track } from "@/lib/track";
 
 const CORNERS = [
   { pos: "top-[8px] left-[8px]", border: "border-t border-l" },
@@ -54,6 +57,20 @@ function formatDate(iso?: string): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+function statusBadge(
+  level: number,
+  completed: boolean,
+  redeemed: boolean
+): string {
+  if (redeemed) {
+    return "Redeemed";
+  }
+  if (completed) {
+    return "Complete";
+  }
+  return `Lv ${String(level).padStart(2, "0")}`;
+}
+
 function statusLabel(isActive: boolean, completed: boolean): string {
   if (isActive) {
     return "Active · 育成中";
@@ -68,15 +85,21 @@ function PlantCard({
   item,
   rules,
   isActive,
+  onRedeem,
+  redeemingId,
 }: {
   item: GrowthItem;
   rules: GrowthRule[];
   isActive: boolean;
+  onRedeem: (item: GrowthItem) => void;
+  redeemingId: number | null;
 }) {
   const level = item.level || levelFor(item.nutrients, rules);
   const rule = rules.find((r) => r.level === level);
   const sequenceLabel = String(item.sequence ?? 1).padStart(2, "0");
   const completed = !!item.completedAt;
+  const redeemed = !!item.redeemedAt;
+  const redeeming = redeemingId === item.id;
 
   return (
     <div className="relative aspect-[4/4.2] overflow-hidden border border-ink bg-paper p-8">
@@ -84,7 +107,7 @@ function PlantCard({
         Plant {sequenceLabel}
       </div>
       <div className="absolute top-[18px] right-[22px] font-mono text-[10px] text-vermilion uppercase tracking-[0.22em]">
-        {completed ? "Complete" : `Lv ${String(level).padStart(2, "0")}`}
+        {statusBadge(level, completed, redeemed)}
         {!completed && rule ? ` · ${rule.name}` : ""}
       </div>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -99,6 +122,25 @@ function PlantCard({
         <span>{statusLabel(isActive, completed)}</span>
         {item.completedAt && <span>{formatDate(item.completedAt)}</span>}
       </div>
+      {/* Redemption CTA / state — shown only on completed items. */}
+      {completed && (
+        <div className="absolute top-[44px] right-[22px] left-[22px] flex justify-center">
+          {redeemed ? (
+            <span className="border border-vermilion bg-paper-alt px-3 py-[6px] font-mono text-[10px] text-vermilion uppercase tracking-[0.18em]">
+              ✓ Redeemed
+            </span>
+          ) : (
+            <button
+              className="border border-ink bg-ink px-4 py-[8px] font-mono text-[10.5px] text-cream uppercase tracking-[0.18em] disabled:opacity-50"
+              disabled={redeeming}
+              onClick={() => onRedeem(item)}
+              type="button"
+            >
+              {redeeming ? "Redeeming…" : "Redeem reward"}
+            </button>
+          )}
+        </div>
+      )}
       {CORNERS.map((corner) => (
         <div
           className={`absolute size-[10px] border-ink ${corner.pos} ${corner.border}`}
@@ -157,11 +199,15 @@ function PlantCollectionGrid({
   activeItem,
   emptySlotCount,
   rules,
+  onRedeem,
+  redeemingId,
 }: {
   items: GrowthItem[];
   activeItem: GrowthItem | undefined;
   emptySlotCount: number;
   rules: GrowthRule[];
+  onRedeem: (item: GrowthItem) => void;
+  redeemingId: number | null;
 }) {
   if (items.length === 0) {
     return <FirstSeedlingCard />;
@@ -173,6 +219,8 @@ function PlantCollectionGrid({
           isActive={!!activeItem && activeItem.id === item.id}
           item={item}
           key={item.id ?? item.sequence}
+          onRedeem={onRedeem}
+          redeemingId={redeemingId}
           rules={rules}
         />
       ))}
@@ -312,6 +360,8 @@ function ProgressPanel({
 
 export default function Page() {
   const { member } = useAuth();
+  const qc = useQueryClient();
+  const [rewardToast, setRewardToast] = useState<Redemption | null>(null);
 
   const { data: items = [] } = useQuery({
     queryKey: ["growth-items", member?.id],
@@ -322,6 +372,55 @@ export default function Page() {
       return [...rows].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
     },
   });
+
+  const redeemMutation = useMutation({
+    mutationFn: async (target: GrowthItem) => {
+      if (!(target.id && member)) {
+        throw new Error("Cannot redeem: missing item or member");
+      }
+      const res = await fetch("/api/redemptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: member.id,
+          growthItemId: target.id,
+        }),
+      });
+      const data = (await res.json()) as
+        | { ok: true; redemption: Redemption }
+        | { error: string; reason?: string };
+      if (!("ok" in data)) {
+        const reason =
+          ("reason" in data && data.reason) ||
+          ("error" in data && data.error) ||
+          "Redemption failed";
+        throw new Error(reason);
+      }
+      return { item: target, redemption: data.redemption };
+    },
+    onSuccess: ({ item, redemption }) => {
+      track("growth_item_redeemed", {
+        memberId: redemption.memberId,
+        growthItemId: redemption.growthItemId,
+        growthItemSequence: redemption.growthItemSequence,
+        redemptionId: redemption.id,
+        provider: redemption.provider,
+      });
+      setRewardToast(redemption);
+      qc.invalidateQueries({ queryKey: ["growth-items", item.memberId] });
+    },
+  });
+
+  const onRedeem = (target: GrowthItem) => {
+    if (redeemMutation.isPending) {
+      return;
+    }
+    redeemMutation.mutate(target);
+  };
+  const redeemingId =
+    redeemMutation.isPending && redeemMutation.variables
+      ? (redeemMutation.variables.id ?? null)
+      : null;
 
   const { data: ledger } = useQuery({
     queryKey: ["ledger", member?.id],
@@ -410,6 +509,8 @@ export default function Page() {
               activeItem={activeItem}
               emptySlotCount={emptySlotCount}
               items={[...completedItems, ...inProgressItems]}
+              onRedeem={onRedeem}
+              redeemingId={redeemingId}
               rules={sortedRules}
             />
           </div>
@@ -464,7 +565,51 @@ export default function Page() {
         </section>
 
         <div className="h-20" />
+        {rewardToast && (
+          <RewardToast
+            onClose={() => setRewardToast(null)}
+            redemption={rewardToast}
+          />
+        )}
       </div>
     </AuthGate>
+  );
+}
+
+function RewardToast({
+  redemption,
+  onClose,
+}: {
+  redemption: Redemption;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      aria-live="polite"
+      className="fixed right-6 bottom-6 z-40 max-w-sm border border-vermilion border-l-[4px] bg-ink p-5 text-cream shadow-lg max-[640px]:right-3 max-[640px]:bottom-3 max-[640px]:left-3"
+      role="status"
+    >
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] opacity-75">
+        Reward redeemed · 報酬交換
+      </div>
+      <div className="mt-1 font-display text-[18px] leading-[1.2]">
+        {redemption.displayName ?? "Reward"}
+      </div>
+      <div className="mt-2 font-mono text-[#ffc7c0] text-[12px] tracking-[0.12em]">
+        {redemption.rewardCode}
+      </div>
+      {redemption.expiresAt && (
+        <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] opacity-65">
+          Expires {new Date(redemption.expiresAt).toLocaleDateString()}
+        </div>
+      )}
+      <button
+        className="mt-3 border border-cream/30 px-3 py-[5px] font-mono text-[10px] text-cream uppercase tracking-[0.16em]"
+        onClick={onClose}
+        type="button"
+      >
+        Close
+      </button>
+    </div>
   );
 }
