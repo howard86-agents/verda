@@ -23,7 +23,11 @@ export const handlers = [
     const url = new URL(request.url);
     const kind = url.searchParams.get("kind") ?? "brand";
 
-    const articles = await db.articles.where("kind").equals(kind).toArray();
+    const articles = await db.articles
+      .where("kind")
+      .equals(kind)
+      .filter((a) => a.status === "published")
+      .toArray();
     return HttpResponse.json(articles);
   }),
 
@@ -87,20 +91,46 @@ export const handlers = [
     return HttpResponse.json(updated);
   }),
 
-  http.post("/api/cms/articles/:id/publish", ({ request }) => {
+  http.post("/api/cms/articles/:id/publish", async ({ request, params }) => {
     const denied = guardRole(request, "publish");
     if (denied) {
       return denied;
     }
-    return HttpResponse.json({ ok: true });
+    const id = params.id as string;
+    const article = await db.articles.get(id);
+    if (!article) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    await db.articles.update(id, {
+      status: "published",
+      publishedAt: new Date().toISOString(),
+      scheduledAt: undefined,
+    });
+    return HttpResponse.json({ ok: true, status: "published" });
   }),
 
-  http.post("/api/cms/articles/:id/unpublish", ({ request }) => {
+  http.post("/api/cms/articles/:id/unpublish", async ({ request, params }) => {
     const denied = guardRole(request, "unpublish");
     if (denied) {
       return denied;
     }
-    return HttpResponse.json({ ok: true });
+    const id = params.id as string;
+    await db.articles.update(id, { status: "unpublished" });
+    return HttpResponse.json({ ok: true, status: "unpublished" });
+  }),
+
+  http.post("/api/cms/articles/:id/schedule", async ({ request, params }) => {
+    const denied = guardRole(request, "publish");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    const body = (await request.json()) as { scheduledAt: string };
+    await db.articles.update(id, {
+      status: "scheduled",
+      scheduledAt: body.scheduledAt,
+    });
+    return HttpResponse.json({ ok: true, status: "scheduled" });
   }),
 
   http.post("/api/cms/members/:id/point-adjust", ({ request }) => {

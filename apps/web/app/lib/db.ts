@@ -11,7 +11,9 @@ export interface Article {
   img: string;
   jp: string;
   kind: string;
+  publishedAt?: string;
   read: number;
+  scheduledAt?: string;
   slug: string;
   status?: string;
   sum: string;
