@@ -12,6 +12,7 @@ import { useRewardToast } from "@/_components/reward-toast";
 import { StoryReactions } from "@/_components/story-reactions";
 import { useAuth } from "@/lib/auth";
 import type { Article } from "@/lib/db";
+import { pickRelated } from "@/lib/related";
 import { sectionLabel, seriesPartLabel } from "@/lib/section";
 import { track } from "@/lib/track";
 import { useToggleSave } from "@/lib/use-collection";
@@ -349,11 +350,15 @@ function DetailSidebar({
   const readNextQuery = useQuery<ReadNextResponse>({
     queryKey: ["story-read-next", article.kind, article.id],
     queryFn: async () => {
+      // Pull a wider candidate pool than we'll show so the related
+      // ranker (issue #100) has something to score against. The
+      // listing handler caps at the user-supplied limit so the
+      // round-trip stays small.
       const params = new URLSearchParams({
         kind: article.kind || "brand",
         sort: "latest",
         page: "1",
-        limit: "3",
+        limit: "12",
       });
       const res = await fetch(`/api/stories?${params}`);
       if (!res.ok) {
@@ -362,9 +367,7 @@ function DetailSidebar({
       return (await res.json()) as ReadNextResponse;
     },
   });
-  const readNext = (readNextQuery.data?.items ?? [])
-    .filter((a) => a.id !== article.id)
-    .slice(0, 2);
+  const readNext = pickRelated(article, readNextQuery.data?.items ?? [], 2);
 
   return (
     <div className="sticky top-[100px] max-[1100px]:static">
