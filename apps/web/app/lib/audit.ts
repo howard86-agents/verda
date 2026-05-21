@@ -5,7 +5,11 @@
 // invariants directly.
 
 import { db } from "./db";
-import { balanceFromLedger, levelFor } from "./rewards";
+import {
+  allocateGrowthForMember,
+  balanceFromLedger,
+  levelFor,
+} from "./rewards";
 
 export interface AdjustPointsInput {
   adminId: string;
@@ -33,8 +37,12 @@ export async function currentBalance(memberId: string): Promise<number> {
  * Apply a manual point adjustment.
  *
  * Validates a non-empty reason and a non-zero amount, then writes a pointLedger
- * row and a paired auditLog row capturing before/after balance. Updates the
- * member's growth level so /grow stays consistent.
+ * row and a paired auditLog row capturing before/after balance.
+ *
+ * Per issue #67 the multi-collectible growth model treats positive admin
+ * adjustments like rewards (delta is allocated to the active growth item,
+ * with overflow + cap rules), while negative adjustments are ledger/audit
+ * only and never shrink growth items.
  *
  * Throws on validation failure so callers can surface a 400.
  */
@@ -72,25 +80,17 @@ export async function adjustPoints(
     createdAt: now,
   });
 
-  // Keep growthItem nutrients/level in sync with the new balance.
+  // Positive admin adjustments allocate nutrients into the multi-item
+  // growth collection. Negative adjustments leave the collection alone:
+  // growth items never shrink (issue #67 product decision).
+  if (input.amount > 0) {
+    await allocateGrowthForMember(input.memberId, input.amount);
+  }
+
+  // Member-level summary for the response: derived from the ledger so
+  // the existing CMS UI keeps working unchanged.
   const growthRules = await db.growthRules.toArray();
   const level = levelFor(balanceAfter, growthRules);
-  const growthItem = await db.growthItems
-    .where("memberId")
-    .equals(input.memberId)
-    .first();
-  if (growthItem?.id) {
-    await db.growthItems.update(growthItem.id, {
-      nutrients: balanceAfter,
-      level,
-    });
-  } else {
-    await db.growthItems.add({
-      memberId: input.memberId,
-      nutrients: balanceAfter,
-      level,
-    });
-  }
 
   return { balanceBefore, balanceAfter, level };
 }
