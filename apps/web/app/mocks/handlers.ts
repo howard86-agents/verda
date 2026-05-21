@@ -2,7 +2,7 @@ import { HttpResponse, http } from "msw";
 import type { CmsAction, CmsRole } from "@/lib/cms-auth";
 import { can } from "@/lib/cms-auth";
 import { db } from "@/lib/db";
-import { awardPoints } from "@/lib/rewards";
+import { awardPoints, levelFor } from "@/lib/rewards";
 
 async function handleCheckIn(memberId: string) {
   const today = new Date().toISOString().slice(0, 10);
@@ -523,5 +523,36 @@ export const handlers = [
     }
     await db.mediaAssets.delete(id);
     return HttpResponse.json({ ok: true });
+  }),
+
+  // Article version history
+  http.get("/api/cms/articles/:id/versions", async ({ params }) => {
+    const articleId = params.id as string;
+    const versions = await db.articleVersions
+      .where("articleId")
+      .equals(articleId)
+      .reverse()
+      .sortBy("timestamp");
+    return HttpResponse.json(versions);
+  }),
+
+  http.post("/api/cms/articles/:id/versions", async ({ request, params }) => {
+    const denied = guardRole(request, "edit_draft");
+    if (denied) {
+      return denied;
+    }
+    const articleId = params.id as string;
+    const body = (await request.json()) as Record<string, unknown>;
+    const version = {
+      id: `ver_${Date.now().toString(36)}`,
+      articleId,
+      editor: (body.editor as string) || "unknown",
+      timestamp: new Date().toISOString(),
+      status: (body.status as string) || "draft",
+      bodyJson: (body.bodyJson as string) || "",
+      summary: (body.summary as string) || "",
+    };
+    await db.articleVersions.put(version);
+    return HttpResponse.json(version, { status: 201 });
   }),
 ];
