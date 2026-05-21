@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { AuthProvider } from "./lib/auth";
+import { GA4Provider } from "./lib/ga4-provider";
 import { seedIfEmpty } from "./lib/seed";
 
 interface ThemeCtx {
@@ -86,7 +87,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeContext.Provider value={value}>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <GA4Provider>{children}</GA4Provider>
+        </AuthProvider>
       </QueryClientProvider>
     </ThemeContext.Provider>
   );
