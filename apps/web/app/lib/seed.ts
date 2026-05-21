@@ -187,9 +187,27 @@ export async function seedIfEmpty() {
   ]);
 
   await db.growthItems.bulkAdd([
-    { memberId: "m_5102", nutrients: 60, level: 2 },
-    { memberId: "m_6033", nutrients: 25, level: 1 },
-    { memberId: "m_7188", nutrients: 5, level: 1 },
+    {
+      memberId: "m_5102",
+      nutrients: 60,
+      level: 2,
+      sequence: 1,
+      createdAt: now,
+    },
+    {
+      memberId: "m_6033",
+      nutrients: 25,
+      level: 1,
+      sequence: 1,
+      createdAt: now,
+    },
+    {
+      memberId: "m_7188",
+      nutrients: 5,
+      level: 1,
+      sequence: 1,
+      createdAt: now,
+    },
   ]);
 
   await db.behaviorLogs.bulkAdd([
