@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { AppSplash } from "./_components/app-splash";
 import { RewardToastProvider } from "./_components/reward-toast";
 import { AuthProvider } from "./lib/auth";
 import { CmsAuthProvider } from "./lib/cms-auth";
@@ -83,7 +84,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const value = useMemo(() => ({ dark, toggleDark }), [dark, toggleDark]);
 
   if (!ready) {
-    return null;
+    return <AppSplash />;
   }
 
   return (
