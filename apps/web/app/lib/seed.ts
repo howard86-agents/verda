@@ -129,6 +129,79 @@ export async function seedIfEmpty() {
     joined: MEMBER.joined,
   });
 
+  // Additional sample members so the CMS member admin list is exerciseable.
+  // Each gets a starter ledger / growth so the detail view shows live data.
+  await db.members.bulkPut([
+    {
+      id: "m_5102",
+      name: "Hana Watanabe",
+      email: "hana.w@example.com",
+      joined: "Joined April 2024",
+    },
+    {
+      id: "m_6033",
+      name: "Renji Park",
+      email: "renji.p@example.com",
+      joined: "Joined May 2024",
+    },
+    {
+      id: "m_7188",
+      name: "Aiko Sato",
+      email: "aiko.s@example.com",
+      joined: "Joined July 2024",
+    },
+  ]);
+
+  const now = new Date().toISOString();
+  await db.pointLedger.bulkAdd([
+    {
+      memberId: "m_5102",
+      amount: 60,
+      balanceAfter: 60,
+      reason: "Onboarding bonus",
+      createdAt: now,
+    },
+    {
+      memberId: "m_6033",
+      amount: 25,
+      balanceAfter: 25,
+      reason: "Read · A walk after dinner",
+      createdAt: now,
+    },
+    {
+      memberId: "m_7188",
+      amount: 5,
+      balanceAfter: 5,
+      reason: "Daily check-in",
+      createdAt: now,
+    },
+  ]);
+
+  await db.growthItems.bulkAdd([
+    { memberId: "m_5102", nutrients: 60, level: 2 },
+    { memberId: "m_6033", nutrients: 25, level: 1 },
+    { memberId: "m_7188", nutrients: 5, level: 1 },
+  ]);
+
+  await db.behaviorLogs.bulkAdd([
+    {
+      memberId: "m_5102",
+      action: "login_91app",
+      createdAt: now,
+    },
+    {
+      memberId: "m_6033",
+      action: "read_complete",
+      articleId: "s04",
+      createdAt: now,
+    },
+    {
+      memberId: "m_7188",
+      action: "check_in",
+      createdAt: now,
+    },
+  ]);
+
   await db.rewardRules.bulkPut([
     {
       id: "rr_read",
