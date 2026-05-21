@@ -2,7 +2,11 @@ import { HttpResponse, http } from "msw";
 import { adjustPoints, currentBalance, softDeleteMember } from "@/lib/audit";
 import type { CmsAction, CmsRole } from "@/lib/cms-auth";
 import { can } from "@/lib/cms-auth";
-import { db } from "@/lib/db";
+import {
+  db,
+  GROWTH_CONFIG_DEFAULT_ID,
+  GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
+} from "@/lib/db";
 import { awardPoints, levelFor } from "@/lib/rewards";
 
 async function handleCheckIn(memberId: string) {
@@ -780,7 +784,77 @@ export const handlers = [
     return HttpResponse.json(version, { status: 201 });
   }),
 
-  // Reward rule settings
+  // Growth-rule settings (issue #30). Reads/writes operate on `growthRules`
+  // (level thresholds + display names) and `growthConfig` (the growth-item
+  // quantity cap; enforcement deferred to #67).
+  http.get("/api/cms/rules/growth", async () => {
+    const rules = await db.growthRules.toArray();
+    const config = (await db.growthConfig.get(GROWTH_CONFIG_DEFAULT_ID)) ?? {
+      id: GROWTH_CONFIG_DEFAULT_ID,
+      maxItemsPerMember: GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
+    };
+    return HttpResponse.json({
+      rules: [...rules].sort((a, b) => a.level - b.level),
+      config,
+    });
+  }),
+
+  http.put("/api/cms/rules/growth/config", async ({ request }) => {
+    const denied = guardRole(request, "manage_rules");
+    if (denied) {
+      return denied;
+    }
+    const body = (await request.json()) as Partial<{
+      maxItemsPerMember: number;
+    }>;
+    const existing = (await db.growthConfig.get(GROWTH_CONFIG_DEFAULT_ID)) ?? {
+      id: GROWTH_CONFIG_DEFAULT_ID,
+      maxItemsPerMember: GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
+    };
+    const nextCap =
+      typeof body.maxItemsPerMember === "number" &&
+      Number.isFinite(body.maxItemsPerMember) &&
+      body.maxItemsPerMember >= 0
+        ? Math.floor(body.maxItemsPerMember)
+        : existing.maxItemsPerMember;
+    const next = { ...existing, maxItemsPerMember: nextCap };
+    await db.growthConfig.put(next);
+    return HttpResponse.json(next);
+  }),
+
+  http.put("/api/cms/rules/growth/:level", async ({ request, params }) => {
+    const denied = guardRole(request, "manage_rules");
+    if (denied) {
+      return denied;
+    }
+    const level = Number.parseInt(params.level as string, 10);
+    if (!Number.isFinite(level)) {
+      return HttpResponse.json({ error: "Invalid level" }, { status: 400 });
+    }
+    const existing = await db.growthRules.get(level);
+    if (!existing) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as Partial<{
+      jp: string;
+      name: string;
+      threshold: number;
+    }>;
+    const next = {
+      ...existing,
+      ...(typeof body.name === "string" ? { name: body.name } : {}),
+      ...(typeof body.jp === "string" ? { jp: body.jp } : {}),
+      ...(typeof body.threshold === "number" &&
+      Number.isFinite(body.threshold) &&
+      body.threshold >= 0
+        ? { threshold: Math.floor(body.threshold) }
+        : {}),
+    };
+    await db.growthRules.put(next);
+    return HttpResponse.json(next);
+  }),
+
+  // Reward rule settings (issue #29).
   http.get("/api/cms/rules/rewards", async () => {
     const rules = await db.rewardRules.toArray();
     return HttpResponse.json(

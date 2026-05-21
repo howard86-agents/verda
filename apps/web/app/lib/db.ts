@@ -98,6 +98,20 @@ export interface GrowthRule {
   threshold: number;
 }
 
+/**
+ * Per-deployment growth configuration. Currently exposes the
+ * growth-item quantity cap (養成物數量上限) as a single keyed row
+ * (`id: "default"`). Storage only — enforcement of the cap lives in
+ * the multi-collectible growth model (issue #67).
+ */
+export interface GrowthConfig {
+  id: string;
+  maxItemsPerMember: number;
+}
+
+export const GROWTH_CONFIG_DEFAULT_ID = "default";
+export const GROWTH_CONFIG_DEFAULT_MAX_ITEMS = 5;
+
 export interface MediaAsset {
   alt: string;
   blob: Blob;
@@ -129,6 +143,7 @@ const db = new Dexie("verda") as Dexie & {
   tags: EntityTable<Tag, "id">;
   rewardRules: EntityTable<RewardRule, "id">;
   growthRules: EntityTable<GrowthRule, "level">;
+  growthConfig: EntityTable<GrowthConfig, "id">;
   mediaAssets: EntityTable<MediaAsset, "id">;
   articleVersions: EntityTable<ArticleVersion, "id">;
   auditLog: EntityTable<AuditLog, "id">;
@@ -150,9 +165,13 @@ db.version(1).stores({
   articleVersions: "id, articleId, timestamp",
 });
 
+// v2 — additive on the v1 schema. Combines:
+//   - issue #30: growthConfig table (growth-item quantity cap, storage-only;
+//     enforcement lives in #67)
+//   - issue #31: auditLog table (point_adjust + member_delete trail) and a
+//     deletedAt index on members so the active list can filter on it
 db.version(2).stores({
-  // Adds auditLog (point_adjust + member_delete trail) and indexes
-  // members.deletedAt so the active list can filter on it.
+  growthConfig: "id",
   members: "id, email, deletedAt",
   auditLog: "++id, memberId, action, createdAt",
 });
