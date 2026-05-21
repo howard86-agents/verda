@@ -7,6 +7,7 @@ import { CoverImage } from "@/_components/cover-image";
 import { IconBookmark, IconShare } from "@/_components/glyphs";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/track";
+import { useToggleSave } from "@/lib/use-collection";
 import { useReadComplete } from "@/lib/use-read-complete";
 
 const TOC = [
@@ -19,9 +20,9 @@ const TOC = [
 const TAGS = ["morning", "notebooks", "sundays", "letters"];
 
 export function DetailReader({ story }: { story: Story }) {
-  const [saved, setSaved] = useState(true);
   const [progress, setProgress] = useState(0);
   const { member } = useAuth();
+  const { isSaved, toggle: toggleSave } = useToggleSave(story.id);
 
   const handleReadComplete = useCallback(async () => {
     if (!member) {
@@ -154,12 +155,12 @@ export function DetailReader({ story }: { story: Story }) {
               </div>
               <button
                 className={`flex items-center gap-2 border border-ink px-[14px] py-2 font-mono text-[10.5px] uppercase tracking-[0.16em] ${
-                  saved ? "bg-ink text-cream" : "bg-transparent text-ink"
+                  isSaved ? "bg-ink text-cream" : "bg-transparent text-ink"
                 }`}
-                onClick={() => setSaved((s) => !s)}
+                onClick={toggleSave}
                 type="button"
               >
-                <IconBookmark filled={saved} /> {saved ? "Saved" : "Save"}
+                <IconBookmark filled={isSaved} /> {isSaved ? "Saved" : "Save"}
               </button>
               <button
                 className="flex items-center gap-2 border border-ink bg-transparent px-[14px] py-2 font-mono text-[10.5px] text-ink uppercase tracking-[0.16em]"
