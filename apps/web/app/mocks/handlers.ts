@@ -10,6 +10,7 @@ import {
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
 } from "@/lib/db";
 import { getReactionState, toggleReaction } from "@/lib/reactions";
+import { createSubmission } from "@/lib/reader-submissions";
 import {
   buildRedemption,
   checkEligibility,
@@ -724,6 +725,41 @@ export const handlers = [
       memberId?: string;
     };
     return handleRedemption(body);
+  }),
+
+  // Public reader-submission endpoint (issue #91). Auth-gated by
+  // requiring a memberId on the body — UI is also gated, this mirror
+  // is so the storage record never lands without attribution. The
+  // handler trusts the body's memberId because the public app's
+  // session is mocked client-side; no SSR auth to verify.
+  http.post("/api/readers/submissions", async ({ request }) => {
+    const body = (await request.json()) as {
+      bodyJson?: string;
+      coverFocalPoint?: { x: number; y: number };
+      coverUrl?: string;
+      memberId?: string;
+      title?: string;
+    };
+    if (!body.memberId) {
+      return HttpResponse.json({ error: "Sign in to submit" }, { status: 401 });
+    }
+    try {
+      const article = await createSubmission({
+        memberId: body.memberId,
+        draft: {
+          title: body.title ?? "",
+          bodyJson: body.bodyJson ?? "",
+          coverUrl: body.coverUrl,
+          coverFocalPoint: body.coverFocalPoint,
+        },
+      });
+      return HttpResponse.json(article, { status: 201 });
+    } catch (e) {
+      return HttpResponse.json(
+        { error: e instanceof Error ? e.message : "Submission failed" },
+        { status: 400 }
+      );
+    }
   }),
 
   http.post("/api/events", async ({ request }) => {
