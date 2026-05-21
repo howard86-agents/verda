@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { CmsAuthProvider } from "./lib/cms-auth";
 import { seedIfEmpty } from "./lib/seed";
 
 interface ThemeCtx {
@@ -84,7 +85,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeContext.Provider value={value}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <CmsAuthProvider>{children}</CmsAuthProvider>
+      </QueryClientProvider>
     </ThemeContext.Provider>
   );
 }
