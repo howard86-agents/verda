@@ -316,6 +316,13 @@ export async function seedIfEmpty() {
       enabled: true,
       limitType: "per-article",
     },
+    {
+      id: "rr_streak_bonus",
+      action: "streak_bonus",
+      points: 5,
+      enabled: true,
+      limitType: "per-day",
+    },
   ]);
 
   await db.categories.bulkPut(
