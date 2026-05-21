@@ -1,5 +1,6 @@
 import { HttpResponse, http } from "msw";
 import { adjustPoints, currentBalance, softDeleteMember } from "@/lib/audit";
+import { evaluateBadges } from "@/lib/badges";
 import type { CmsAction, CmsRole } from "@/lib/cms-auth";
 import { can } from "@/lib/cms-auth";
 import {
@@ -151,7 +152,16 @@ async function handleCheckIn(memberId: string) {
     await allocateGrowthForMember(memberId, pts);
   }
 
-  return HttpResponse.json({ ok: true, points: pts, balance: newBalance });
+  // Badge evaluation (issue #93) — runs after the growth allocation so
+  // a level-up on check-in can trigger first_bloom.
+  const newBadges = await evaluateBadges(memberId);
+
+  return HttpResponse.json({
+    ok: true,
+    points: pts,
+    balance: newBalance,
+    newBadges: newBadges.map((b) => b.badgeId),
+  });
 }
 
 function getRoleFromHeader(request: Request): CmsRole {
@@ -678,7 +688,16 @@ export const handlers = [
       }
 
       const reward = await awardPoints(memberId, "read_complete", articleId);
-      return HttpResponse.json({ ok: true, ...reward });
+      // Evaluate badges after the reward + growth allocation has
+      // landed so reading milestones and first-bloom can trigger
+      // off the same write (issue #93). Awarded ids are returned so
+      // the client can show a celebratory cue if it wants.
+      const newBadges = await evaluateBadges(memberId);
+      return HttpResponse.json({
+        ok: true,
+        ...reward,
+        newBadges: newBadges.map((b) => b.badgeId),
+      });
     }
 
     if (action === "check_in") {
