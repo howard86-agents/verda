@@ -15,7 +15,7 @@ const NAV = [
   { id: "social", en: "Submissions", jp: "投稿", href: null },
   { id: "media", en: "Media", jp: "メディア", href: "/cms/media" },
   { id: "members", en: "Members", jp: "会員", href: "/cms/members/m_4421" },
-  { id: "rules", en: "Gamification", jp: "報酬", href: null },
+  { id: "rules", en: "Gamification", jp: "報酬", href: "/cms/rules" },
   { id: "redeem", en: "Redemption", jp: "引換", href: null },
   { id: "analytics", en: "Analytics", jp: "解析", href: null },
   { id: "settings", en: "Settings", jp: "設定", href: "/cms/taxonomy" },
