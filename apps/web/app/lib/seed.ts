@@ -5,7 +5,11 @@ import {
   SOCIAL,
   STORIES,
 } from "@verda/data";
-import { db } from "./db";
+import {
+  db,
+  GROWTH_CONFIG_DEFAULT_ID,
+  GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
+} from "./db";
 
 const SEED_KEY = "verda.seeded";
 
@@ -121,6 +125,11 @@ export async function seedIfEmpty() {
       threshold: g.threshold,
     }))
   );
+
+  await db.growthConfig.put({
+    id: GROWTH_CONFIG_DEFAULT_ID,
+    maxItemsPerMember: GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
+  });
 
   await db.members.put({
     id: MEMBER.memberId,

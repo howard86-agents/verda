@@ -85,6 +85,20 @@ export interface GrowthRule {
   threshold: number;
 }
 
+/**
+ * Per-deployment growth configuration. Currently exposes the
+ * growth-item quantity cap (養成物數量上限) as a single keyed row
+ * (`id: "default"`). Storage only — enforcement of the cap lives in
+ * the multi-collectible growth model (issue #67).
+ */
+export interface GrowthConfig {
+  id: string;
+  maxItemsPerMember: number;
+}
+
+export const GROWTH_CONFIG_DEFAULT_ID = "default";
+export const GROWTH_CONFIG_DEFAULT_MAX_ITEMS = 5;
+
 export interface MediaAsset {
   alt: string;
   blob: Blob;
@@ -116,6 +130,7 @@ const db = new Dexie("verda") as Dexie & {
   tags: EntityTable<Tag, "id">;
   rewardRules: EntityTable<RewardRule, "id">;
   growthRules: EntityTable<GrowthRule, "level">;
+  growthConfig: EntityTable<GrowthConfig, "id">;
   mediaAssets: EntityTable<MediaAsset, "id">;
   articleVersions: EntityTable<ArticleVersion, "id">;
 };
@@ -134,6 +149,12 @@ db.version(1).stores({
   growthRules: "level",
   mediaAssets: "id, filename, mimeType",
   articleVersions: "id, articleId, timestamp",
+});
+
+// v2 — additive: introduces the growthConfig table for issue #30.
+// Cap value is storage-only; enforcement lives in #67.
+db.version(2).stores({
+  growthConfig: "id",
 });
 
 export { db };
