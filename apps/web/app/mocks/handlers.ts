@@ -3,7 +3,12 @@ import { adjustPoints, currentBalance, softDeleteMember } from "@/lib/audit";
 import { evaluateBadges } from "@/lib/badges";
 import type { CmsAction, CmsRole } from "@/lib/cms-auth";
 import { can } from "@/lib/cms-auth";
-import { listComments, postComment } from "@/lib/comments";
+import {
+  listAllRecentComments,
+  listComments,
+  postComment,
+  removeComment,
+} from "@/lib/comments";
 import {
   db,
   GROWTH_CONFIG_DEFAULT_ID,
@@ -939,6 +944,50 @@ export const handlers = [
       return HttpResponse.json(result);
     }
   ),
+
+  // CMS comment moderation (issue #101). Listing returns recent
+  // comments across every article, including soft-removed rows so
+  // moderators can see history. Removal sets `removedAt` so the public
+  // reader filters them out without losing the audit trail.
+  http.get("/api/cms/comments", async ({ request }) => {
+    const url = new URL(request.url);
+    const limit = Math.max(
+      1,
+      Math.min(200, Number(url.searchParams.get("limit") ?? "50"))
+    );
+    const items = await listAllRecentComments(limit);
+    const articleIds = [...new Set(items.map((c) => c.articleId))];
+    const articles =
+      articleIds.length > 0
+        ? await db.articles.where("id").anyOf(articleIds).toArray()
+        : [];
+    const byId = new Map(articles.map((a) => [a.id, a]));
+    return HttpResponse.json({
+      items: items.map((c) => {
+        const a = byId.get(c.articleId);
+        return {
+          ...c,
+          articleSlug: a?.slug ?? "",
+          articleTitle: a?.title ?? "(unknown article)",
+          articleKind: a?.kind ?? "",
+        };
+      }),
+      total: items.length,
+    });
+  }),
+
+  http.delete("/api/cms/comments/:id", async ({ params, request }) => {
+    const denied = guardRole(request, "moderate_comments");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    const updated = await removeComment(id);
+    if (!updated) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return HttpResponse.json({ ok: true, comment: updated });
+  }),
 
   // Taxonomy: Categories
   http.get("/api/cms/categories", async () => {
