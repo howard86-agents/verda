@@ -598,6 +598,41 @@ export const handlers = [
     return HttpResponse.json(version, { status: 201 });
   }),
 
+  // Reward rule settings
+  http.get("/api/cms/rules/rewards", async () => {
+    const rules = await db.rewardRules.toArray();
+    return HttpResponse.json(
+      [...rules].sort((a, b) => a.action.localeCompare(b.action))
+    );
+  }),
+
+  http.put("/api/cms/rules/rewards/:id", async ({ request, params }) => {
+    const denied = guardRole(request, "manage_rules");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    const existing = await db.rewardRules.get(id);
+    if (!existing) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as Partial<{
+      enabled: boolean;
+      limitType: string;
+      points: number;
+    }>;
+    const next = {
+      ...existing,
+      ...(typeof body.points === "number" ? { points: body.points } : {}),
+      ...(typeof body.enabled === "boolean" ? { enabled: body.enabled } : {}),
+      ...(typeof body.limitType === "string"
+        ? { limitType: body.limitType }
+        : {}),
+    };
+    await db.rewardRules.put(next);
+    return HttpResponse.json(next);
+  }),
+
   // Batch operations on articles
   http.post("/api/cms/articles/batch", async ({ request }) => {
     const body = (await request.json()) as {
