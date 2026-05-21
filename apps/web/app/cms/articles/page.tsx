@@ -2,6 +2,7 @@
 
 // CMS · Article list — table with filters, status pills, batch actions.
 
+import Link from "next/link";
 import { useState } from "react";
 import { CmsShell } from "@/_components/cms-shell";
 import { IconFilter, IconMore } from "@/_components/glyphs";
@@ -177,12 +178,12 @@ export default function CmsArticlesPage() {
           >
             Import CSV
           </button>
-          <button
+          <Link
             className="bg-vermilion px-[14px] py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em]"
-            type="button"
+            href="/cms/articles/new"
           >
             + New article
-          </button>
+          </Link>
         </>
       }
       active="articles"
@@ -297,9 +298,12 @@ export default function CmsArticlesPage() {
                     )}
                   </button>
                   <div>
-                    <div className="font-display font-medium text-[15.5px] leading-[1.25]">
+                    <Link
+                      className="font-display font-medium text-[15.5px] leading-[1.25] hover:text-vermilion"
+                      href={`/cms/articles/${r.id}/edit`}
+                    >
                       {r.t}
-                    </div>
+                    </Link>
                     <div className="mt-[2px] font-display text-[12px] text-muted italic">
                       {r.jp}
                     </div>
