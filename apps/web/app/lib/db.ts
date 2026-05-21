@@ -218,6 +218,32 @@ export interface ArticleVersion {
   timestamp: string;
 }
 
+/**
+ * The themed reaction types a member can leave on an article (issue #90).
+ *
+ * - `grew`    — 🌱 *grew me*
+ * - `learned` — 💡 *learned*
+ * - `loved`   — 🤍 *loved*
+ *
+ * Each member can hold at most one reaction of each kind per article;
+ * toggling the same kind twice removes the row.
+ */
+export type ReactionKind = "grew" | "learned" | "loved";
+
+/**
+ * A single member's reaction of a given kind on an article (issue #90).
+ * The `[memberId+articleId+kind]` compound index keeps lookup +
+ * uniqueness checks O(1). One reaction-of-each-kind per member per
+ * article is the model: toggling the same kind twice deletes the row.
+ */
+export interface Reaction {
+  articleId: string;
+  createdAt: string;
+  id?: number;
+  kind: ReactionKind;
+  memberId: string;
+}
+
 const db = new Dexie("verda") as Dexie & {
   articles: EntityTable<Article, "id">;
   members: EntityTable<Member, "id">;
@@ -234,6 +260,7 @@ const db = new Dexie("verda") as Dexie & {
   articleVersions: EntityTable<ArticleVersion, "id">;
   auditLog: EntityTable<AuditLog, "id">;
   redemptions: EntityTable<Redemption, "id">;
+  reactions: EntityTable<Reaction, "id">;
 };
 
 db.version(1).stores({
@@ -295,6 +322,15 @@ db.version(3)
 // don't need their own indexes.
 db.version(4).stores({
   redemptions: "id, memberId, &growthItemId, createdAt",
+});
+
+// v5 — issue #90: themed reactions on articles.
+// Adds the `reactions` table with a unique compound `[memberId+articleId+kind]`
+// index so toggling the same kind twice is a no-op insert and per-member
+// uniqueness is enforced at the storage layer. Indexed on articleId so
+// the reader can roll up counts per kind in one scan.
+db.version(5).stores({
+  reactions: "++id, articleId, memberId, &[memberId+articleId+kind]",
 });
 
 export { db };
