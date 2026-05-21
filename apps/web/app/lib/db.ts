@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from "dexie";
 
 export interface Article {
   author: string;
+  bodyJson?: string;
   cat: string;
   date: string;
   id: string;
@@ -12,6 +13,7 @@ export interface Article {
   kind: string;
   read: number;
   slug: string;
+  status?: string;
   sum: string;
   tag: string;
   title: string;
@@ -82,7 +84,7 @@ const db = new Dexie("verda") as Dexie & {
 };
 
 db.version(1).stores({
-  articles: "id, slug, kind, cat, tag",
+  articles: "id, slug, kind, cat, tag, status",
   members: "id, email",
   behaviorLogs: "++id, memberId, action, articleId",
   pointLedger: "++id, memberId",
