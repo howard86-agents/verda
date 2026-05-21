@@ -253,4 +253,105 @@ export const handlers = [
 
     return HttpResponse.json({ ok: true });
   }),
+
+  // Taxonomy: Categories
+  http.get("/api/cms/categories", async () => {
+    const categories = await db.categories.toArray();
+    return HttpResponse.json(categories);
+  }),
+
+  http.post("/api/cms/categories", async ({ request }) => {
+    const denied = guardRole(request, "manage_taxonomy");
+    if (denied) {
+      return denied;
+    }
+    const body = (await request.json()) as { name: string };
+    const id = body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    await db.categories.put({ id, name: body.name });
+    return HttpResponse.json({ id, name: body.name }, { status: 201 });
+  }),
+
+  http.put("/api/cms/categories/:id", async ({ request, params }) => {
+    const denied = guardRole(request, "manage_taxonomy");
+    if (denied) {
+      return denied;
+    }
+    const body = (await request.json()) as { name: string };
+    const id = params.id as string;
+    await db.categories.put({ id, name: body.name });
+    return HttpResponse.json({ id, name: body.name });
+  }),
+
+  http.delete("/api/cms/categories/:id", async ({ request, params }) => {
+    const denied = guardRole(request, "manage_taxonomy");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    // Check if any articles reference this category
+    const cat = await db.categories.get(id);
+    if (cat) {
+      const refs = await db.articles.where("cat").equals(cat.name).count();
+      if (refs > 0) {
+        return HttpResponse.json(
+          {
+            error: `Cannot delete: ${refs} article(s) use this category. Reassign them first.`,
+          },
+          { status: 409 }
+        );
+      }
+      await db.categories.delete(id);
+    }
+    return HttpResponse.json({ ok: true });
+  }),
+
+  // Taxonomy: Tags
+  http.get("/api/cms/tags", async () => {
+    const tags = await db.tags.toArray();
+    return HttpResponse.json(tags);
+  }),
+
+  http.post("/api/cms/tags", async ({ request }) => {
+    const denied = guardRole(request, "manage_taxonomy");
+    if (denied) {
+      return denied;
+    }
+    const body = (await request.json()) as { name: string };
+    const id = body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    await db.tags.put({ id, name: body.name });
+    return HttpResponse.json({ id, name: body.name }, { status: 201 });
+  }),
+
+  http.put("/api/cms/tags/:id", async ({ request, params }) => {
+    const denied = guardRole(request, "manage_taxonomy");
+    if (denied) {
+      return denied;
+    }
+    const body = (await request.json()) as { name: string };
+    const id = params.id as string;
+    await db.tags.put({ id, name: body.name });
+    return HttpResponse.json({ id, name: body.name });
+  }),
+
+  http.delete("/api/cms/tags/:id", async ({ request, params }) => {
+    const denied = guardRole(request, "manage_taxonomy");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    const tag = await db.tags.get(id);
+    if (tag) {
+      const refs = await db.articles.where("tag").equals(tag.name).count();
+      if (refs > 0) {
+        return HttpResponse.json(
+          {
+            error: `Cannot delete: ${refs} article(s) use this tag. Reassign them first.`,
+          },
+          { status: 409 }
+        );
+      }
+      await db.tags.delete(id);
+    }
+    return HttpResponse.json({ ok: true });
+  }),
 ];

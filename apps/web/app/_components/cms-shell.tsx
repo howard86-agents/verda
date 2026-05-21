@@ -18,7 +18,7 @@ const NAV = [
   { id: "rules", en: "Gamification", jp: "報酬", href: null },
   { id: "redeem", en: "Redemption", jp: "引換", href: null },
   { id: "analytics", en: "Analytics", jp: "解析", href: null },
-  { id: "settings", en: "Settings", jp: "設定", href: null },
+  { id: "settings", en: "Settings", jp: "設定", href: "/cms/taxonomy" },
 ] as const;
 
 type NavId = (typeof NAV)[number]["id"];
