@@ -88,6 +88,48 @@ function guardRole(request: Request, action: CmsAction) {
   return null;
 }
 
+async function applyBatchAction(
+  id: string,
+  action: string,
+  body: { cat?: string; status?: string; tag?: string }
+): Promise<boolean> {
+  const article = await db.articles.get(id);
+  if (!article) {
+    return false;
+  }
+  switch (action) {
+    case "set_category":
+      if (body.cat != null) {
+        await db.articles.update(id, { cat: body.cat });
+        return true;
+      }
+      return false;
+    case "set_tags":
+      if (body.tag != null) {
+        await db.articles.update(id, { tag: body.tag });
+        return true;
+      }
+      return false;
+    case "set_status":
+      if (body.status != null) {
+        await db.articles.update(id, { status: body.status });
+        return true;
+      }
+      return false;
+    case "publish":
+      await db.articles.update(id, {
+        status: "published",
+        publishedAt: new Date().toISOString(),
+      });
+      return true;
+    case "unpublish":
+      await db.articles.update(id, { status: "unpublished" });
+      return true;
+    default:
+      return false;
+  }
+}
+
 export const handlers = [
   http.get("/api/stories", async ({ request }) => {
     const url = new URL(request.url);
@@ -554,5 +596,38 @@ export const handlers = [
     };
     await db.articleVersions.put(version);
     return HttpResponse.json(version, { status: 201 });
+  }),
+
+  // Batch operations on articles
+  http.post("/api/cms/articles/batch", async ({ request }) => {
+    const body = (await request.json()) as {
+      action: string;
+      cat?: string;
+      ids: string[];
+      status?: string;
+      tag?: string;
+    };
+    const { ids, action } = body;
+
+    if (action === "publish" || action === "unpublish") {
+      const denied = guardRole(request, action);
+      if (denied) {
+        return denied;
+      }
+    } else {
+      const denied = guardRole(request, "edit_draft");
+      if (denied) {
+        return denied;
+      }
+    }
+
+    let updated = 0;
+    for (const id of ids) {
+      const ok = await applyBatchAction(id, action, body);
+      if (ok) {
+        updated++;
+      }
+    }
+    return HttpResponse.json({ ok: true, updated });
   }),
 ];
