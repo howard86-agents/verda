@@ -13,7 +13,7 @@ const NAV = [
   { id: "dashboard", en: "Dashboard", jp: "ダッシュ", href: null },
   { id: "articles", en: "Articles", jp: "記事", href: "/cms/articles" },
   { id: "comments", en: "Comments", jp: "コメ", href: "/cms/comments" },
-  { id: "social", en: "Submissions", jp: "投稿", href: null },
+  { id: "social", en: "Submissions", jp: "投稿", href: "/cms/submissions" },
   { id: "media", en: "Media", jp: "メディア", href: "/cms/media" },
   { id: "members", en: "Members", jp: "会員", href: "/cms/members" },
   { id: "rules", en: "Gamification", jp: "報酬", href: "/cms/rules" },
