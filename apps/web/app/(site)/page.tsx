@@ -4,6 +4,7 @@ import { CoverImage } from "@/_components/cover-image";
 import { Eyebrow } from "@/_components/eyebrow";
 import { IconDrop } from "@/_components/glyphs";
 import { Plant } from "@/_components/plant";
+import { sectionLabel, seriesPartLabel } from "@/lib/section";
 
 export default function HomePage() {
   return (
@@ -100,11 +101,16 @@ export default function HomePage() {
                       </div>
                       <div>
                         <div className="font-mono text-[9.5px] text-muted uppercase tracking-[0.18em]">
-                          {s.cat} · {s.read} min · {s.date}
+                          {sectionLabel(s)} · {s.read} min · {s.date}
                         </div>
                         <h3 className="mt-[6px] font-display font-medium text-[22px] leading-[1.15] tracking-[-0.005em]">
                           {s.title}
                         </h3>
+                        {seriesPartLabel(s.series) && (
+                          <div className="mt-[3px] font-mono text-[9px] text-vermilion uppercase tracking-[0.16em]">
+                            {seriesPartLabel(s.series)}
+                          </div>
+                        )}
                         <div className="mt-1 font-display text-[13px] text-muted italic">
                           {s.jp}
                         </div>
@@ -130,7 +136,7 @@ export default function HomePage() {
                   </div>
                   <div>
                     <div className="font-mono text-[9.5px] text-muted uppercase tracking-[0.18em]">
-                      {s.cat} · {s.read} min
+                      {sectionLabel(s)} · {s.read} min
                     </div>
                     <h3 className="mt-1 font-display font-medium text-[18px] leading-[1.18]">
                       <Link href={`/stories/${s.slug}`}>{s.title}</Link>
