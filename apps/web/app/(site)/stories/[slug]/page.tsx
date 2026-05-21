@@ -1,21 +1,17 @@
-import { STORIES } from "@verda/data";
-import { notFound } from "next/navigation";
 import { DetailReader } from "./detail-reader";
 
-export function generateStaticParams() {
-  return STORIES.map((s) => ({ slug: s.slug }));
-}
-
+/**
+ * Public story detail. Resolves the article by slug client-side via the same
+ * `/api/stories/:slug` handler the rest of the site uses, so CMS-authored
+ * articles round-trip through to the public URL (issue #74). The route is
+ * fully dynamic — the source of truth is the in-browser MSW + Dexie store
+ * that backs the API, not a build-time `STORIES` constant.
+ */
 export default async function StoryDetailPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const story = STORIES.find((s) => s.slug === slug);
-  if (!story) {
-    notFound();
-  }
-
-  return <DetailReader story={story} />;
+  return <DetailReader slug={slug} />;
 }
