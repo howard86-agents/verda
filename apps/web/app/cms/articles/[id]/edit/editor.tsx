@@ -9,6 +9,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { CATEGORIES } from "@verda/data";
 import NextLink from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ArticlePreview } from "@/_components/article-preview";
 import { CmsShell } from "@/_components/cms-shell";
 import { MediaPicker } from "@/_components/media-picker";
 import { adminIdFor, can, useCmsAuth } from "@/lib/cms-auth";
@@ -157,6 +158,7 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
   const [showMediaPicker, setShowMediaPicker] = useState<
     "cover" | "inline" | null
   >(null);
+  const [showPreview, setShowPreview] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [versions, setVersions] = useState<
     {
@@ -340,6 +342,15 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
           >
             ← Back
           </NextLink>
+          {canEdit && (
+            <button
+              className="border border-ink bg-paper px-[14px] py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
+              onClick={() => setShowPreview(true)}
+              type="button"
+            >
+              Preview
+            </button>
+          )}
           {canEdit && (
             <button
               className="bg-ink px-[14px] py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em] disabled:opacity-50"
@@ -700,6 +711,21 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
             }
             setShowMediaPicker(null);
           }}
+        />
+      )}
+      {showPreview && canEdit && (
+        <ArticlePreview
+          draft={{
+            title,
+            jp,
+            cat,
+            tag,
+            author,
+            coverUrl: coverUrl || null,
+            coverFocalPoint,
+            bodyJson: editor ? JSON.stringify(editor.getJSON()) : "",
+          }}
+          onClose={() => setShowPreview(false)}
         />
       )}
     </CmsShell>
