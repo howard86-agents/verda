@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GROWTH_LEVELS } from "@verda/data";
 import { useState } from "react";
 import { AuthGate } from "@/_components/auth-gate";
+import { BadgeShelf } from "@/_components/badge-shelf";
 import { CheckInButton } from "@/_components/check-in-button";
 import { Eyebrow } from "@/_components/eyebrow";
 import { IconDrop } from "@/_components/glyphs";
@@ -562,6 +563,10 @@ export default function Page() {
               ))}
             </div>
           </div>
+        </section>
+
+        <section className="shell">
+          <BadgeShelf />
         </section>
 
         <div className="h-20" />
