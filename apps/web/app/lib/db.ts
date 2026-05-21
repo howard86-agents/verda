@@ -23,10 +23,23 @@ export interface Article {
 }
 
 export interface Member {
+  deletedAt?: string;
   email: string;
   id: string;
   joined: string;
   name: string;
+}
+
+export interface AuditLog {
+  action: "point_adjust" | "member_delete";
+  adminId: string;
+  amount?: number;
+  balanceAfter?: number;
+  balanceBefore?: number;
+  createdAt: string;
+  id?: number;
+  memberId: string;
+  reason: string;
 }
 
 export interface BehaviorLog {
@@ -118,6 +131,7 @@ const db = new Dexie("verda") as Dexie & {
   growthRules: EntityTable<GrowthRule, "level">;
   mediaAssets: EntityTable<MediaAsset, "id">;
   articleVersions: EntityTable<ArticleVersion, "id">;
+  auditLog: EntityTable<AuditLog, "id">;
 };
 
 db.version(1).stores({
@@ -134,6 +148,13 @@ db.version(1).stores({
   growthRules: "level",
   mediaAssets: "id, filename, mimeType",
   articleVersions: "id, articleId, timestamp",
+});
+
+db.version(2).stores({
+  // Adds auditLog (point_adjust + member_delete trail) and indexes
+  // members.deletedAt so the active list can filter on it.
+  members: "id, email, deletedAt",
+  auditLog: "++id, memberId, action, createdAt",
 });
 
 export { db };

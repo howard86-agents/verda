@@ -1,4 +1,5 @@
 import { HttpResponse, http } from "msw";
+import { adjustPoints, currentBalance, softDeleteMember } from "@/lib/audit";
 import type { CmsAction, CmsRole } from "@/lib/cms-auth";
 import { can } from "@/lib/cms-auth";
 import { db } from "@/lib/db";
@@ -75,6 +76,23 @@ async function handleCheckIn(memberId: string) {
 
 function getRoleFromHeader(request: Request): CmsRole {
   return (request.headers.get("x-cms-role") as CmsRole) || "editor";
+}
+
+function adminIdForRequest(request: Request): string {
+  // Prefer an explicit admin id header if present; otherwise derive from the
+  // role header so the audit trail records the active admin in dev/demo.
+  const explicit = request.headers.get("x-cms-admin-id");
+  if (explicit) {
+    return explicit;
+  }
+  const role = getRoleFromHeader(request);
+  const map: Record<CmsRole, string> = {
+    editor: "admin_editor_01",
+    publisher: "admin_publisher_01",
+    admin: "admin_admin_01",
+    "customer-service": "admin_cs_01",
+  };
+  return map[role];
 }
 
 function guardRole(request: Request, action: CmsAction) {
@@ -276,20 +294,184 @@ export const handlers = [
     return HttpResponse.json({ ok: true, status: "scheduled" });
   }),
 
-  http.post("/api/cms/members/:id/point-adjust", ({ request }) => {
-    const denied = guardRole(request, "point_adjust");
-    if (denied) {
-      return denied;
-    }
-    return HttpResponse.json({ ok: true });
+  http.get("/api/cms/members", async ({ request }) => {
+    const url = new URL(request.url);
+    const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+    const includeDeleted = url.searchParams.get("includeDeleted") === "1";
+
+    const all = await db.members.toArray();
+    const visible = includeDeleted ? all : all.filter((m) => !m.deletedAt);
+    const matched = q
+      ? visible.filter(
+          (m) =>
+            m.id.toLowerCase().includes(q) ||
+            m.name.toLowerCase().includes(q) ||
+            m.email.toLowerCase().includes(q)
+        )
+      : visible;
+
+    const enriched = await Promise.all(
+      matched.map(async (m) => {
+        const balance = await currentBalance(m.id);
+        const growth = await db.growthItems
+          .where("memberId")
+          .equals(m.id)
+          .first();
+        return {
+          id: m.id,
+          name: m.name,
+          email: m.email,
+          joined: m.joined,
+          deletedAt: m.deletedAt ?? null,
+          balance,
+          level: growth?.level ?? 1,
+        };
+      })
+    );
+
+    enriched.sort((a, b) => a.name.localeCompare(b.name));
+    return HttpResponse.json({ items: enriched, total: enriched.length });
   }),
 
-  http.delete("/api/cms/members/:id", ({ request }) => {
+  http.get("/api/cms/members/:id", async ({ params }) => {
+    const id = params.id as string;
+    const member = await db.members.get(id);
+    if (!member) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const ledger = await db.pointLedger.where("memberId").equals(id).toArray();
+    const ledgerSorted = [...ledger].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    const balance = await currentBalance(id);
+
+    const growth = await db.growthItems.where("memberId").equals(id).first();
+    const growthRules = await db.growthRules.toArray();
+    const level = growth?.level ?? levelFor(balance, growthRules);
+    const currentRule = growthRules.find((r) => r.level === level);
+    const nextRule = growthRules.find((r) => r.level === level + 1);
+
+    const behaviorLogs = await db.behaviorLogs
+      .where("memberId")
+      .equals(id)
+      .toArray();
+    const behaviorSorted = [...behaviorLogs].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    const collections = await db.collections
+      .where("memberId")
+      .equals(id)
+      .toArray();
+    const articleIds = collections.map((c) => c.articleId);
+    const collectedArticles =
+      articleIds.length > 0
+        ? await db.articles.where("id").anyOf(articleIds).toArray()
+        : [];
+
+    const auditEntries = await db.auditLog
+      .where("memberId")
+      .equals(id)
+      .toArray();
+    const auditSorted = [...auditEntries].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    return HttpResponse.json({
+      member: {
+        id: member.id,
+        name: member.name,
+        email: member.email,
+        joined: member.joined,
+        deletedAt: member.deletedAt ?? null,
+      },
+      balance,
+      growth: {
+        level,
+        nutrients: growth?.nutrients ?? balance,
+        currentName: currentRule?.name ?? "Seed",
+        currentJp: currentRule?.jp ?? "種",
+        nextName: nextRule?.name ?? null,
+        nextThreshold: nextRule?.threshold ?? null,
+      },
+      ledger: ledgerSorted,
+      behaviorLogs: behaviorSorted,
+      collections: collectedArticles,
+      auditLog: auditSorted,
+    });
+  }),
+
+  http.post(
+    "/api/cms/members/:id/point-adjust",
+    async ({ request, params }) => {
+      const denied = guardRole(request, "point_adjust");
+      if (denied) {
+        return denied;
+      }
+      const id = params.id as string;
+      const member = await db.members.get(id);
+      if (!member) {
+        return HttpResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      if (member.deletedAt) {
+        return HttpResponse.json(
+          { error: "Member is deleted" },
+          { status: 409 }
+        );
+      }
+      const body = (await request.json()) as {
+        amount?: number;
+        reason?: string;
+      };
+      const amount = Number(body.amount);
+      const reason = String(body.reason ?? "");
+      try {
+        const result = await adjustPoints({
+          memberId: id,
+          adminId: adminIdForRequest(request),
+          amount,
+          reason,
+        });
+        return HttpResponse.json({ ok: true, ...result });
+      } catch (e) {
+        return HttpResponse.json(
+          { error: e instanceof Error ? e.message : "Adjustment failed" },
+          { status: 400 }
+        );
+      }
+    }
+  ),
+
+  http.delete("/api/cms/members/:id", async ({ request, params }) => {
     const denied = guardRole(request, "member_delete");
     if (denied) {
       return denied;
     }
-    return HttpResponse.json({ ok: true });
+    const id = params.id as string;
+    const url = new URL(request.url);
+    const reason = (url.searchParams.get("reason") ?? "").trim();
+    if (!reason) {
+      return HttpResponse.json(
+        { error: "Reason is required" },
+        { status: 400 }
+      );
+    }
+    try {
+      const result = await softDeleteMember({
+        memberId: id,
+        adminId: adminIdForRequest(request),
+        reason,
+      });
+      return HttpResponse.json({ ok: true, ...result });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Delete failed";
+      const status = msg.includes("not found") ? 404 : 400;
+      return HttpResponse.json({ error: msg }, { status });
+    }
   }),
 
   http.get("/api/stories/:slug", async ({ params }) => {
