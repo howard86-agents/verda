@@ -68,6 +68,38 @@ async function handleRedemption(body: {
   return HttpResponse.json({ ok: true, redemption });
 }
 
+/**
+ * Auto-promote any `scheduled` articles whose `scheduledAt` time has
+ * passed to `published` before serving listing handlers (issue #77).
+ * The CMS UI wires `Schedule` to `POST /api/cms/articles/:id/schedule`,
+ * which sets the row to `scheduled`; this side-effect ensures the
+ * promotion eventually fires the next time *anyone* opens a list.
+ */
+async function promoteDueScheduled(): Promise<void> {
+  const now = Date.now();
+  const due = await db.articles
+    .filter(
+      (a) =>
+        a.status === "scheduled" &&
+        !!a.scheduledAt &&
+        new Date(a.scheduledAt).getTime() <= now
+    )
+    .toArray();
+  if (due.length === 0) {
+    return;
+  }
+  const stamp = new Date().toISOString();
+  await Promise.all(
+    due.map((a) =>
+      db.articles.update(a.id, {
+        status: "published",
+        publishedAt: stamp,
+        scheduledAt: undefined,
+      })
+    )
+  );
+}
+
 async function handleCheckIn(memberId: string) {
   const today = new Date().toISOString().slice(0, 10);
   const logs = await db.behaviorLogs
@@ -198,6 +230,7 @@ async function applyBatchAction(
 
 export const handlers = [
   http.get("/api/stories", async ({ request }) => {
+    await promoteDueScheduled();
     const url = new URL(request.url);
     const kind = url.searchParams.get("kind") ?? "brand";
     const cat = url.searchParams.get("cat");
@@ -241,6 +274,7 @@ export const handlers = [
   }),
 
   http.get("/api/cms/articles", async () => {
+    await promoteDueScheduled();
     const articles = await db.articles.toArray();
     return HttpResponse.json(articles);
   }),

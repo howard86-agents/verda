@@ -191,6 +191,7 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
     "cover" | "inline" | null
   >(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [versions, setVersions] = useState<
     {
@@ -381,80 +382,38 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
   return (
     <CmsShell
       actions={
-        <>
-          <NextLink
-            className="border border-line bg-paper px-3 py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
-            href="/cms/articles"
-          >
-            ← Back
-          </NextLink>
-          {canEdit && (
-            <button
-              className="border border-ink bg-paper px-[14px] py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
-              onClick={() => setShowPreview(true)}
-              type="button"
-            >
-              Preview
-            </button>
-          )}
-          {canEdit && (
-            <button
-              className="bg-ink px-[14px] py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em] disabled:opacity-50"
-              disabled={saving}
-              onClick={save}
-              type="button"
-            >
-              {saving ? "Saving…" : "Save draft"}
-            </button>
-          )}
-          {currentId &&
-            can("publish", role) &&
-            article?.status !== "published" && (
-              <button
-                className="bg-vermilion px-[14px] py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em]"
-                onClick={async () => {
-                  const res = await fetch(
-                    `/api/cms/articles/${currentId}/publish`,
-                    {
-                      method: "POST",
-                      headers: { "x-cms-role": role },
-                    }
-                  );
-                  if (res.ok) {
-                    setArticle((a) => (a ? { ...a, status: "published" } : a));
-                    track("admin_article_publish", { articleId: currentId });
-                  }
-                }}
-                type="button"
-              >
-                Publish →
-              </button>
-            )}
-          {currentId &&
-            can("unpublish", role) &&
-            article?.status === "published" && (
-              <button
-                className="border border-ink bg-paper px-[14px] py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
-                onClick={async () => {
-                  const res = await fetch(
-                    `/api/cms/articles/${currentId}/unpublish`,
-                    {
-                      method: "POST",
-                      headers: { "x-cms-role": role },
-                    }
-                  );
-                  if (res.ok) {
-                    setArticle((a) =>
-                      a ? { ...a, status: "unpublished" } : a
-                    );
-                  }
-                }}
-                type="button"
-              >
-                Unpublish
-              </button>
-            )}
-        </>
+        <EditorActions
+          article={article}
+          articleId={currentId}
+          canEdit={canEdit}
+          onOpenPreview={() => setShowPreview(true)}
+          onOpenSchedule={() => setShowScheduleDialog(true)}
+          onPublish={async () => {
+            const res = await fetch(`/api/cms/articles/${currentId}/publish`, {
+              method: "POST",
+              headers: { "x-cms-role": role },
+            });
+            if (res.ok) {
+              setArticle((a) => (a ? { ...a, status: "published" } : a));
+              track("admin_article_publish", { articleId: currentId });
+            }
+          }}
+          onSave={save}
+          onUnpublish={async () => {
+            const res = await fetch(
+              `/api/cms/articles/${currentId}/unpublish`,
+              {
+                method: "POST",
+                headers: { "x-cms-role": role },
+              }
+            );
+            if (res.ok) {
+              setArticle((a) => (a ? { ...a, status: "unpublished" } : a));
+            }
+          }}
+          role={role}
+          saving={saving}
+        />
       }
       active="articles"
       breadcrumb={`Articles / ${currentId ? "Edit" : "New"}`}
@@ -605,6 +564,17 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
                 <span className="size-2 bg-muted" />
                 {article?.status?.toUpperCase() ?? "NEW"}
               </div>
+              {article?.status === "scheduled" && article?.scheduledAt && (
+                <div className="mt-2 font-mono text-[10px] text-vermilion uppercase tracking-[0.14em]">
+                  Scheduled for{" "}
+                  {new Date(article.scheduledAt).toLocaleString([], {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -774,6 +744,264 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
           onClose={() => setShowPreview(false)}
         />
       )}
+      {showScheduleDialog && currentId && (
+        <ScheduleDialog
+          articleId={currentId}
+          currentScheduledAt={article?.scheduledAt}
+          onClose={() => setShowScheduleDialog(false)}
+          onPublishNow={async () => {
+            const res = await fetch(`/api/cms/articles/${currentId}/publish`, {
+              method: "POST",
+              headers: { "x-cms-role": role },
+            });
+            if (res.ok) {
+              setArticle((a) =>
+                a ? { ...a, status: "published", scheduledAt: undefined } : a
+              );
+              track("admin_article_publish", { articleId: currentId });
+            }
+            setShowScheduleDialog(false);
+          }}
+          onScheduled={(scheduledAt) => {
+            setArticle((a) =>
+              a ? { ...a, status: "scheduled", scheduledAt } : a
+            );
+            setShowScheduleDialog(false);
+          }}
+          role={role}
+        />
+      )}
     </CmsShell>
   );
+}
+
+interface EditorActionsProps {
+  article: ArticleData | null;
+  articleId: string | null;
+  canEdit: boolean;
+  onOpenPreview: () => void;
+  onOpenSchedule: () => void;
+  onPublish: () => Promise<void>;
+  onSave: () => Promise<void>;
+  onUnpublish: () => Promise<void>;
+  role: ReturnType<typeof useCmsAuth>["role"];
+  saving: boolean;
+}
+
+/**
+ * The CMS topbar action slot for the editor: Preview / Save draft /
+ * Schedule / Publish / Unpublish. Extracted from `ArticleEditor` so the
+ * parent component stays under the cognitive-complexity lint cap once the
+ * Schedule branch is added (issue #77).
+ */
+function EditorActions({
+  article,
+  articleId,
+  canEdit,
+  onOpenPreview,
+  onOpenSchedule,
+  onPublish,
+  onSave,
+  onUnpublish,
+  role,
+  saving,
+}: EditorActionsProps) {
+  const showSchedule =
+    !!articleId && can("publish", role) && article?.status !== "published";
+  const showPublish = showSchedule;
+  const showUnpublish =
+    !!articleId && can("unpublish", role) && article?.status === "published";
+  return (
+    <>
+      <NextLink
+        className="border border-line bg-paper px-3 py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
+        href="/cms/articles"
+      >
+        ← Back
+      </NextLink>
+      {canEdit && (
+        <button
+          className="border border-ink bg-paper px-[14px] py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
+          onClick={onOpenPreview}
+          type="button"
+        >
+          Preview
+        </button>
+      )}
+      {canEdit && (
+        <button
+          className="bg-ink px-[14px] py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em] disabled:opacity-50"
+          disabled={saving}
+          onClick={onSave}
+          type="button"
+        >
+          {saving ? "Saving…" : "Save draft"}
+        </button>
+      )}
+      {showSchedule && (
+        <button
+          className="border border-ink bg-paper px-[14px] py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
+          onClick={onOpenSchedule}
+          type="button"
+        >
+          {article?.status === "scheduled" ? "Reschedule" : "Schedule"}
+        </button>
+      )}
+      {showPublish && (
+        <button
+          className="bg-vermilion px-[14px] py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em]"
+          onClick={onPublish}
+          type="button"
+        >
+          Publish →
+        </button>
+      )}
+      {showUnpublish && (
+        <button
+          className="border border-ink bg-paper px-[14px] py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
+          onClick={onUnpublish}
+          type="button"
+        >
+          Unpublish
+        </button>
+      )}
+    </>
+  );
+}
+
+interface ScheduleDialogProps {
+  articleId: string;
+  currentScheduledAt: string | undefined;
+  onClose: () => void;
+  onPublishNow: () => Promise<void>;
+  onScheduled: (scheduledAt: string) => void;
+  role: ReturnType<typeof useCmsAuth>["role"];
+}
+
+/**
+ * Modal dialog presenting a `<input type="datetime-local">` and a Schedule
+ * action wired to `POST /api/cms/articles/:id/schedule` (issue #77). A
+ * past date is treated as immediate publish — the chosen behaviour from
+ * the issue's "reject or treat as immediate publish" branch.
+ */
+function ScheduleDialog({
+  articleId,
+  currentScheduledAt,
+  onClose,
+  onPublishNow,
+  onScheduled,
+  role,
+}: ScheduleDialogProps) {
+  const [value, setValue] = useState<string>(() =>
+    currentScheduledAt ? toLocalInputValue(currentScheduledAt) : ""
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    setError(null);
+    if (!value) {
+      setError("Pick a date and time first.");
+      return;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      setError("That date is not valid.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (date.getTime() <= Date.now()) {
+        // Past date → treated as immediate publish per the chosen branch.
+        await onPublishNow();
+        return;
+      }
+      const res = await fetch(`/api/cms/articles/${articleId}/schedule`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-cms-role": role,
+        },
+        body: JSON.stringify({ scheduledAt: date.toISOString() }),
+      });
+      if (!res.ok) {
+        setError("Could not schedule the article.");
+        return;
+      }
+      onScheduled(date.toISOString());
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      aria-label="Schedule article"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 px-4"
+      role="dialog"
+    >
+      <div className="w-full max-w-sm border border-ink bg-paper p-6">
+        <div className="font-mono text-[10.5px] text-muted uppercase tracking-[0.18em]">
+          Schedule article · 排程発布
+        </div>
+        <h2 className="mt-1 font-display font-medium text-[20px]">
+          Pick a future date &amp; time
+        </h2>
+        <p className="mt-2 font-display text-[13px] text-muted leading-[1.5]">
+          The article will publish automatically when the time is due. A past
+          date publishes immediately.
+        </p>
+        <label className="mt-4 block">
+          <span className="font-mono text-[10px] text-muted uppercase tracking-[0.16em]">
+            Publish at
+          </span>
+          <input
+            className="mt-1 w-full border border-line bg-paper px-2 py-2 font-sans text-[13px]"
+            disabled={submitting}
+            min={toLocalInputValue(new Date().toISOString())}
+            onChange={(e) => setValue(e.target.value)}
+            type="datetime-local"
+            value={value}
+          />
+        </label>
+        {error && (
+          <div className="mt-2 font-mono text-[10px] text-vermilion uppercase tracking-[0.12em]">
+            {error}
+          </div>
+        )}
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            className="border border-line bg-paper px-3 py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
+            disabled={submitting}
+            onClick={onClose}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            className="bg-ink px-3 py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em] disabled:opacity-50"
+            disabled={submitting}
+            onClick={submit}
+            type="button"
+          >
+            {submitting ? "Scheduling…" : "Schedule"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Convert an ISO timestamp into the `YYYY-MM-DDTHH:mm` shape that
+ * `<input type="datetime-local">` expects, in the user's local timezone.
+ */
+function toLocalInputValue(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
