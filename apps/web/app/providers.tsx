@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { RewardToastProvider } from "./_components/reward-toast";
 import { AuthProvider } from "./lib/auth";
 import { CmsAuthProvider } from "./lib/cms-auth";
 import { GA4Provider } from "./lib/ga4-provider";
@@ -90,7 +91,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <CmsAuthProvider>
-            <GA4Provider>{children}</GA4Provider>
+            <RewardToastProvider>
+              <GA4Provider>{children}</GA4Provider>
+            </RewardToastProvider>
           </CmsAuthProvider>
         </AuthProvider>
       </QueryClientProvider>
