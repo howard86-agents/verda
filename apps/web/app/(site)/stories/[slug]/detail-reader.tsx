@@ -8,6 +8,7 @@ import { ArticleBody } from "@/_components/article-body";
 import { CoverImage } from "@/_components/cover-image";
 import { IconBookmark, IconShare } from "@/_components/glyphs";
 import { useRewardToast } from "@/_components/reward-toast";
+import { StoryReactions } from "@/_components/story-reactions";
 import { useAuth } from "@/lib/auth";
 import type { Article } from "@/lib/db";
 import { track } from "@/lib/track";
@@ -306,6 +307,7 @@ function DetailReaderBody({ article }: { article: Article }) {
                 ))}
               </div>
             )}
+            <StoryReactions articleId={article.id} />
             <div ref={bottomRef} />
           </div>
 
