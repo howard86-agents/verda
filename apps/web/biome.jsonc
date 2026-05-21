@@ -5,5 +5,8 @@
     "ultracite/biome/core",
     "ultracite/biome/react",
     "ultracite/biome/next"
-  ]
+  ],
+  "files": {
+    "includes": ["!public/mockServiceWorker.js"]
+  }
 }

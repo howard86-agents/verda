@@ -9,18 +9,27 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.100.11",
     "@verda/data": "*",
+    "dexie": "^4.4.2",
+    "msw": "^2.14.6",
     "next": "16.2.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
-    "@verda/typescript-config": "*",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "@verda/typescript-config": "*",
     "tailwindcss": "^4",
     "typescript": "6.0.3"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }

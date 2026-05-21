@@ -1,18 +1,74 @@
 "use client";
 
-import { CATEGORIES, COLLECTED, STORIES } from "@verda/data";
+import { useQuery } from "@tanstack/react-query";
+import { CATEGORIES, COLLECTED } from "@verda/data";
 import Link from "next/link";
 import { useState } from "react";
 import { CoverImage } from "@/_components/cover-image";
 import { Eyebrow } from "@/_components/eyebrow";
 import { IconBookmark, IconFilter } from "@/_components/glyphs";
+import type { Article } from "@/lib/db";
 
 const PAGES = ["1", "2", "3", "...", "12"];
 
 export default function StoriesPage() {
   const [cat, setCat] = useState("All");
+
+  const {
+    data: stories,
+    isLoading,
+    isError,
+  } = useQuery<Article[]>({
+    queryKey: ["stories", "brand"],
+    queryFn: async () => {
+      const res = await fetch("/api/stories?kind=brand");
+      if (!res.ok) {
+        throw new Error("Failed to fetch stories");
+      }
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="bg-cream text-ink">
+        <div className="shell flex min-h-[50vh] items-center justify-center">
+          <p className="font-mono text-[12px] text-muted uppercase tracking-[0.16em]">
+            Loading stories…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-cream text-ink">
+        <div className="shell flex min-h-[50vh] items-center justify-center">
+          <p className="font-mono text-[12px] text-vermilion uppercase tracking-[0.16em]">
+            Failed to load stories. Please try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const filtered =
-    cat === "All" ? STORIES : STORIES.filter((s) => s.cat === cat);
+    cat === "All"
+      ? (stories ?? [])
+      : (stories ?? []).filter((s) => s.cat === cat);
+
+  if (!stories || stories.length === 0) {
+    return (
+      <div className="bg-cream text-ink">
+        <div className="shell flex min-h-[50vh] items-center justify-center">
+          <p className="font-mono text-[12px] text-muted uppercase tracking-[0.16em]">
+            No stories yet.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-cream text-ink">
