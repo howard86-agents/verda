@@ -30,6 +30,7 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@verda/typescript-config": "*",
+    "fake-indexeddb": "^6.2.5",
     "tailwindcss": "^4",
     "typescript": "6.0.3"
   },
