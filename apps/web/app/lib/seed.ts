@@ -1,4 +1,4 @@
-import { GROWTH_LEVELS, STORIES } from "@verda/data";
+import { CATEGORIES, GROWTH_LEVELS, STORIES } from "@verda/data";
 import { db } from "./db";
 
 const SEED_KEY = "verda.seeded";
@@ -37,6 +37,21 @@ export async function seedIfEmpty() {
       name: g.name,
       jp: g.jp,
       threshold: g.threshold,
+    }))
+  );
+
+  await db.categories.bulkPut(
+    CATEGORIES.filter((c) => c !== "All").map((c) => ({
+      id: c.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      name: c,
+    }))
+  );
+
+  const tags = [...new Set(STORIES.map((s) => s.tag))];
+  await db.tags.bulkPut(
+    tags.map((t) => ({
+      id: t.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      name: t,
     }))
   );
 

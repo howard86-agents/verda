@@ -55,6 +55,16 @@ export interface Collection {
   memberId: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+}
+
 export interface RewardRule {
   action: string;
   enabled: boolean;
@@ -77,6 +87,8 @@ const db = new Dexie("verda") as Dexie & {
   pointLedger: EntityTable<PointLedger, "id">;
   growthItems: EntityTable<GrowthItem, "id">;
   collections: EntityTable<Collection, "id">;
+  categories: EntityTable<Category, "id">;
+  tags: EntityTable<Tag, "id">;
   rewardRules: EntityTable<RewardRule, "id">;
   growthRules: EntityTable<GrowthRule, "level">;
 };
@@ -88,6 +100,8 @@ db.version(1).stores({
   pointLedger: "++id, memberId",
   growthItems: "++id, memberId",
   collections: "++id, memberId, articleId, [memberId+articleId]",
+  categories: "id, name",
+  tags: "id, name",
   rewardRules: "id, action",
   growthRules: "level",
 });
