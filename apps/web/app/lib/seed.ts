@@ -28,6 +28,16 @@ export async function seedIfEmpty() {
       read: s.read,
       date: s.date,
       author: s.author,
+      status: "published",
+      bodyJson: JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: s.sum }],
+          },
+        ],
+      }),
     }))
   );
 

@@ -10,6 +10,12 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.11",
+    "@tiptap/extension-image": "^3.23.5",
+    "@tiptap/extension-link": "^3.23.5",
+    "@tiptap/extension-placeholder": "^3.23.5",
+    "@tiptap/pm": "^3.23.5",
+    "@tiptap/react": "^3.23.5",
+    "@tiptap/starter-kit": "^3.23.5",
     "@verda/data": "*",
     "dexie": "^4.4.2",
     "msw": "^2.14.6",
