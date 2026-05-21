@@ -307,3 +307,132 @@ describe("awardPoints() — total limit type", () => {
     expect(result.balance).toBe(50);
   });
 });
+
+describe("awardPoints() — multi-collectible growth (issue #67)", () => {
+  beforeEach(async () => {
+    await db.open();
+    await db.rewardRules.put({
+      id: "rr_read",
+      action: "read_complete",
+      points: 10,
+      enabled: true,
+      limitType: "per-article",
+    });
+    await db.growthRules.bulkPut([
+      { level: 1, name: "Seed", jp: "種", threshold: 0 },
+      { level: 2, name: "Sprout", jp: "芽", threshold: 50 },
+      { level: 3, name: "Bloom", jp: "花", threshold: 150 },
+      { level: 4, name: "Fully grown", jp: "結実", threshold: 300 },
+    ]);
+    await db.growthConfig.put({ id: "default", maxItemsPerMember: 3 });
+  });
+
+  afterEach(async () => {
+    await db.delete();
+  });
+
+  test("first reward spawns Plant 01 with sequence 1", async () => {
+    await awardPoints("m_1", "read_complete", "s01");
+    const items = await db.growthItems
+      .where("memberId")
+      .equals("m_1")
+      .toArray();
+    expect(items).toHaveLength(1);
+    expect(items[0].sequence).toBe(1);
+    expect(items[0].nutrients).toBe(10);
+    expect(items[0].completedAt).toBeUndefined();
+    expect(items[0].createdAt).toBeTruthy();
+  });
+
+  test("subsequent rewards top up the active item until it completes", async () => {
+    // Big award rule: 200 per call, max threshold = 300.
+    await db.rewardRules.put({
+      id: "rr_big",
+      action: "big_action",
+      points: 200,
+      enabled: true,
+      limitType: "per-article",
+    });
+    await awardPoints("m_1", "big_action", "a1");
+    const after1 = await db.growthItems
+      .where("memberId")
+      .equals("m_1")
+      .toArray();
+    expect(after1).toHaveLength(1);
+    expect(after1[0].nutrients).toBe(200);
+    expect(after1[0].completedAt).toBeUndefined();
+
+    await awardPoints("m_1", "big_action", "a2");
+    const items = await db.growthItems
+      .where("memberId")
+      .equals("m_1")
+      .toArray();
+    items.sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+    expect(items).toHaveLength(2);
+    expect(items[0].nutrients).toBe(300);
+    expect(items[0].completedAt).toBeTruthy();
+    expect(items[0].level).toBe(4);
+    expect(items[1].sequence).toBe(2);
+    expect(items[1].nutrients).toBe(100);
+    expect(items[1].completedAt).toBeUndefined();
+  });
+
+  test("respects the configured cap and stops creating items at the limit", async () => {
+    await db.growthConfig.put({ id: "default", maxItemsPerMember: 2 });
+    await db.rewardRules.put({
+      id: "rr_huge",
+      action: "huge_action",
+      points: 350,
+      enabled: true,
+      limitType: "per-article",
+    });
+    await awardPoints("m_1", "huge_action", "a1");
+    await awardPoints("m_1", "huge_action", "a2");
+
+    let items = await db.growthItems.where("memberId").equals("m_1").toArray();
+    items.sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+    expect(items).toHaveLength(2);
+    expect(items[0].nutrients).toBe(300);
+    expect(items[0].completedAt).toBeTruthy();
+    expect(items[1].nutrients).toBe(300);
+    expect(items[1].completedAt).toBeTruthy();
+
+    // A third award attempt at the cap must not spawn a Plant 03.
+    await awardPoints("m_1", "huge_action", "a3");
+    items = await db.growthItems.where("memberId").equals("m_1").toArray();
+    expect(items).toHaveLength(2);
+    // Ledger still records each award even when growth is capped.
+    const ledger = await db.pointLedger
+      .where("memberId")
+      .equals("m_1")
+      .toArray();
+    expect(ledger.length).toBe(3);
+  });
+
+  test("disabled rule awards 0 points and does not create a growth item", async () => {
+    await db.rewardRules.put({
+      id: "rr_off",
+      action: "off_action",
+      points: 5,
+      enabled: false,
+      limitType: "per-article",
+    });
+    await awardPoints("m_1", "off_action", "s01");
+    const items = await db.growthItems
+      .where("memberId")
+      .equals("m_1")
+      .toArray();
+    expect(items).toHaveLength(0);
+  });
+
+  test("re-awarding the same article (per-article guard) does not double-allocate", async () => {
+    await awardPoints("m_1", "read_complete", "s01");
+    await awardPoints("m_1", "read_complete", "s01");
+    const items = await db.growthItems
+      .where("memberId")
+      .equals("m_1")
+      .toArray();
+    expect(items).toHaveLength(1);
+    expect(items[0].nutrients).toBe(10);
+  });
+});

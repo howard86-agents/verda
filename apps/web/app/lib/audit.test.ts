@@ -101,7 +101,7 @@ describe("adjustPoints()", () => {
     });
   });
 
-  test("supports negative amounts (deduction) and updates growth level", async () => {
+  test("supports negative amounts (deduction) without shrinking growth", async () => {
     await adjustPoints({
       memberId: MEMBER_ID,
       adminId: ADMIN_ID,
@@ -129,15 +129,17 @@ describe("adjustPoints()", () => {
       reason: "Reversal",
     });
 
+    // Per the issue #67 product decision, negative admin adjustments are
+    // ledger/audit only and never shrink the growth-item collection.
     const growth = await db.growthItems
       .where("memberId")
       .equals(MEMBER_ID)
       .first();
-    expect(growth?.nutrients).toBe(40);
-    expect(growth?.level).toBe(1);
+    expect(growth?.nutrients).toBe(60);
+    expect(growth?.level).toBe(2);
   });
 
-  test("crossing a threshold updates the growth level", async () => {
+  test("crossing a threshold updates the active growth item level", async () => {
     const result = await adjustPoints({
       memberId: MEMBER_ID,
       adminId: ADMIN_ID,
@@ -151,6 +153,19 @@ describe("adjustPoints()", () => {
       .first();
     expect(growth?.level).toBe(2);
     expect(growth?.nutrients).toBe(75);
+    expect(growth?.sequence).toBe(1);
+  });
+
+  test("zero-amount adjustments are rejected (growth untouched)", async () => {
+    await expect(
+      adjustPoints({
+        memberId: MEMBER_ID,
+        adminId: ADMIN_ID,
+        amount: 0,
+        reason: "noop",
+      })
+    ).rejects.toThrow(NON_ZERO);
+    expect(await db.growthItems.count()).toBe(0);
   });
 
   test("rejects empty reason", async () => {

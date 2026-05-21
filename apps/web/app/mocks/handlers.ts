@@ -7,7 +7,7 @@ import {
   GROWTH_CONFIG_DEFAULT_ID,
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
 } from "@/lib/db";
-import { awardPoints, levelFor } from "@/lib/rewards";
+import { allocateGrowthForMember, awardPoints, levelFor } from "@/lib/rewards";
 
 async function handleCheckIn(memberId: string) {
   const today = new Date().toISOString().slice(0, 10);
@@ -36,9 +36,9 @@ async function handleCheckIn(memberId: string) {
     .where("memberId")
     .equals(memberId)
     .toArray();
-  const currentBalance =
+  const currentLedgerBalance =
     ledger.length > 0 ? Math.max(...ledger.map((e) => e.balanceAfter)) : 0;
-  const newBalance = currentBalance + pts;
+  const newBalance = currentLedgerBalance + pts;
 
   await db.behaviorLogs.add({
     memberId,
@@ -55,24 +55,9 @@ async function handleCheckIn(memberId: string) {
       createdAt: new Date().toISOString(),
     });
 
-    const rules = await db.growthRules.toArray();
-    const newLevel = levelFor(newBalance, rules);
-    const growthItem = await db.growthItems
-      .where("memberId")
-      .equals(memberId)
-      .first();
-    if (growthItem?.id) {
-      await db.growthItems.update(growthItem.id, {
-        nutrients: newBalance,
-        level: newLevel,
-      });
-    } else {
-      await db.growthItems.add({
-        memberId,
-        nutrients: newBalance,
-        level: newLevel,
-      });
-    }
+    // Multi-collectible allocation (issue #67) — allocate the awarded
+    // delta into the active growth item, overflow + cap enforced.
+    await allocateGrowthForMember(memberId, pts);
   }
 
   return HttpResponse.json({ ok: true, points: pts, balance: newBalance });
@@ -351,8 +336,22 @@ export const handlers = [
     );
     const balance = await currentBalance(id);
 
-    const growth = await db.growthItems.where("memberId").equals(id).first();
+    const growthItems = await db.growthItems
+      .where("memberId")
+      .equals(id)
+      .toArray();
     const growthRules = await db.growthRules.toArray();
+    // Pick the active item (newest non-completed, by sequence) so the
+    // single-item summary the CMS detail UI consumes still makes sense
+    // under the multi-collectible model. If every item is complete (or
+    // none exist) fall back to the most recent item, then to the
+    // member-level balance/level.
+    const sortedItems = [...growthItems].sort(
+      (a, b) => (b.sequence ?? 0) - (a.sequence ?? 0)
+    );
+    const activeItem =
+      sortedItems.find((g) => !g.completedAt) ?? sortedItems[0];
+    const growth = activeItem;
     const level = growth?.level ?? levelFor(balance, growthRules);
     const currentRule = growthRules.find((r) => r.level === level);
     const nextRule = growthRules.find((r) => r.level === level + 1);

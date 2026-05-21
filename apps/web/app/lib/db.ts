@@ -59,11 +59,30 @@ export interface PointLedger {
   reason: string;
 }
 
+/**
+ * A single growth item ("Plant 0N") in a member's collection.
+ *
+ * Members hold up to `growthConfig.maxItemsPerMember` items concurrently
+ * (issue #67). At any point one item is "active" — the newest one with
+ * `completedAt` unset — and receives nutrients from rewards/positive
+ * admin adjustments. When its nutrients reach the highest growth-rule
+ * threshold it is marked completed and the overflow seeds the next item,
+ * provided the cap has not been reached.
+ *
+ * `sequence` is a 1-based index per member used for display ("Plant 01",
+ * "Plant 02", …) and to disambiguate items with identical timestamps.
+ */
 export interface GrowthItem {
+  /** ISO timestamp when this item was first allocated. */
+  completedAt?: string;
+  /** ISO timestamp when this item was first allocated. */
+  createdAt?: string;
   id?: number;
   level: number;
   memberId: string;
   nutrients: number;
+  /** 1-based per-member display order: Plant 01, Plant 02, … */
+  sequence?: number;
 }
 
 export interface Collection {
@@ -101,16 +120,22 @@ export interface GrowthRule {
 /**
  * Per-deployment growth configuration. Currently exposes the
  * growth-item quantity cap (養成物數量上限) as a single keyed row
- * (`id: "default"`). Storage only — enforcement of the cap lives in
- * the multi-collectible growth model (issue #67).
+ * (`id: "default"`). The product-decision name is `maxGrowthItems`
+ * (default `3`); we keep the storage column `maxItemsPerMember` from
+ * issue #30 so existing data round-trips, and treat the two names as
+ * aliases. Enforcement of the cap lives in the multi-collectible growth
+ * model (issue #67).
  */
 export interface GrowthConfig {
   id: string;
+  /**
+   * Product alias: `maxGrowthItems`. Default `3`.
+   */
   maxItemsPerMember: number;
 }
 
 export const GROWTH_CONFIG_DEFAULT_ID = "default";
-export const GROWTH_CONFIG_DEFAULT_MAX_ITEMS = 5;
+export const GROWTH_CONFIG_DEFAULT_MAX_ITEMS = 3;
 
 export interface MediaAsset {
   alt: string;
@@ -175,5 +200,29 @@ db.version(2).stores({
   members: "id, email, deletedAt",
   auditLog: "++id, memberId, action, createdAt",
 });
+
+// v3 — issue #67: multi-collectible growth.
+// Adds an explicit per-member ordering index for growth items so the
+// "Plant 01 / Plant 02 / …" sequence is queryable, and backfills the
+// new GrowthItem fields (`sequence`, `createdAt`) on existing rows so
+// they migrate cleanly as the member's first plant.
+db.version(3)
+  .stores({
+    growthItems: "++id, memberId, [memberId+sequence]",
+  })
+  .upgrade(async (tx) => {
+    const now = new Date().toISOString();
+    await tx
+      .table<GrowthItem>("growthItems")
+      .toCollection()
+      .modify((item) => {
+        if (item.sequence == null) {
+          item.sequence = 1;
+        }
+        if (item.createdAt == null) {
+          item.createdAt = now;
+        }
+      });
+  });
 
 export { db };

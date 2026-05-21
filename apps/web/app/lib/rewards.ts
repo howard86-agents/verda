@@ -1,5 +1,14 @@
 import type { GrowthRule, PointLedger } from "./db";
-import { db } from "./db";
+import {
+  db,
+  GROWTH_CONFIG_DEFAULT_ID,
+  GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
+  type GrowthConfig,
+} from "./db";
+import {
+  type AllocationPlan,
+  planAllocationWithDefaults,
+} from "./growth-allocation";
 
 export function levelFor(nutrients: number, rules: GrowthRule[]): number {
   const sorted = [...rules].sort((a, b) => b.threshold - a.threshold);
@@ -29,6 +38,76 @@ async function readState(memberId: string) {
   const balance = balanceFromLedger(ledger);
   const growthRules = await db.growthRules.toArray();
   return { balance, level: levelFor(balance, growthRules) };
+}
+
+/**
+ * Read the configured growth-item cap (`maxGrowthItems`). Falls back to
+ * the compiled-in default when the row is missing — typecheck and fresh
+ * checkouts run before the seed initialises growthConfig.
+ */
+async function readGrowthCap(): Promise<number> {
+  const config: GrowthConfig | undefined = await db.growthConfig.get(
+    GROWTH_CONFIG_DEFAULT_ID
+  );
+  return config?.maxItemsPerMember ?? GROWTH_CONFIG_DEFAULT_MAX_ITEMS;
+}
+
+/**
+ * Persist a multi-collectible growth allocation plan. Caller is
+ * responsible for first computing `delta` (typically the points just
+ * awarded) and producing the plan via `planAllocationWithDefaults`. We
+ * apply update-then-create to keep `sequence` order stable when both
+ * land in the same award.
+ */
+export async function applyGrowthAllocationPlan(
+  memberId: string,
+  plan: AllocationPlan
+): Promise<void> {
+  for (const step of plan.steps) {
+    if (step.type === "update") {
+      const patch: Record<string, unknown> = {
+        nutrients: step.nutrients,
+        level: step.level,
+      };
+      if (step.completedAt) {
+        patch.completedAt = step.completedAt;
+      }
+      await db.growthItems.update(step.id, patch);
+    } else {
+      await db.growthItems.add({
+        memberId,
+        nutrients: step.nutrients,
+        level: step.level,
+        sequence: step.sequence,
+        createdAt: step.createdAt,
+        ...(step.completedAt ? { completedAt: step.completedAt } : {}),
+      });
+    }
+  }
+}
+
+/**
+ * Plan + apply a growth-item allocation for `memberId`. The growth-item
+ * collection drives its own per-item levels and the configured cap; the
+ * member's overall balance/level (returned to callers) still comes from
+ * the ledger.
+ */
+export async function allocateGrowthForMember(
+  memberId: string,
+  delta: number
+): Promise<AllocationPlan> {
+  if (!Number.isFinite(delta) || delta <= 0) {
+    return { allocated: 0, leftover: Math.max(0, delta || 0), steps: [] };
+  }
+  const items = await db.growthItems
+    .where("memberId")
+    .equals(memberId)
+    .toArray();
+  const growthRules = await db.growthRules.toArray();
+  const cap = await readGrowthCap();
+  const plan = planAllocationWithDefaults(items, delta, cap, growthRules);
+  await applyGrowthAllocationPlan(memberId, plan);
+  return plan;
 }
 
 /**
@@ -120,27 +199,16 @@ export async function awardPoints(
     createdAt: new Date().toISOString(),
   });
 
-  // Recompute growth level
+  // Allocate the awarded delta into the multi-collectible growth model
+  // (issue #67). The active item receives nutrients first; overflow
+  // seeds new items up to `growthConfig.maxItemsPerMember`.
+  await allocateGrowthForMember(memberId, rule.points);
+
+  // The returned `level` summarises the member's overall progress for
+  // legacy callers (Header/teaser): it's still derived from the ledger
+  // balance rather than any single growth item's level.
   const growthRules = await db.growthRules.toArray();
   const newLevel = levelFor(newBalance, growthRules);
-
-  const growthItem = await db.growthItems
-    .where("memberId")
-    .equals(memberId)
-    .first();
-
-  if (growthItem?.id) {
-    await db.growthItems.update(growthItem.id, {
-      nutrients: newBalance,
-      level: newLevel,
-    });
-  } else {
-    await db.growthItems.add({
-      memberId,
-      nutrients: newBalance,
-      level: newLevel,
-    });
-  }
 
   return { points: rule.points, balance: newBalance, level: newLevel };
 }
