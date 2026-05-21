@@ -137,8 +137,40 @@ function CoverPlaceholder({
   );
 }
 
+/**
+ * Append a version-history entry for the just-saved article. Pulled out of
+ * `save()` so the main save flow stays under the cognitive-complexity cap
+ * (issue #76).
+ */
+async function recordVersion(args: {
+  bodyJson: string;
+  role: ReturnType<typeof useCmsAuth>["role"];
+  savedId: string;
+  status: string | undefined;
+}) {
+  const { savedId, role, status, bodyJson } = args;
+  await fetch(`/api/cms/articles/${savedId}/versions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-cms-role": role,
+    },
+    body: JSON.stringify({
+      editor: adminIdFor(role),
+      status: status || "draft",
+      bodyJson,
+      summary: "",
+    }),
+  });
+}
+
 export function ArticleEditor({ articleId }: { articleId: string | null }) {
   const { role } = useCmsAuth();
+  // `currentId` tracks the canonical id the editor is operating against. It
+  // starts as the route's `articleId` (null on /cms/articles/new) and adopts
+  // the server-assigned id after the first POST so subsequent saves PUT the
+  // same record instead of creating duplicates (issue #76).
+  const [currentId, setCurrentId] = useState<string | null>(articleId);
   const [article, setArticle] = useState<ArticleData | null>(null);
   const [title, setTitle] = useState("");
   const [jp, setJp] = useState("");
@@ -178,6 +210,21 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
     }
   }, []);
 
+  /**
+   * After the first successful POST, adopt the server-assigned id locally
+   * and reflect it in the URL via `history.replaceState`. The replaceState
+   * call deliberately doesn't go through `next/navigation`'s router so the
+   * editor stays mounted — preserving in-progress edits — while a reload
+   * still resolves to `/cms/articles/<id>/edit` (issue #76).
+   */
+  const adoptCreatedArticle = useCallback((data: ArticleData) => {
+    setCurrentId(data.id);
+    setArticle(data);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `/cms/articles/${data.id}/edit`);
+    }
+  }, []);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -194,6 +241,7 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
 
   // Load article
   useEffect(() => {
+    setCurrentId(articleId);
     if (!articleId) {
       return;
     }
@@ -234,6 +282,12 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
     if (!editor) {
       return;
     }
+    // Guard against concurrent saves: a stale autosave firing while a
+    // manual save is in flight can otherwise issue a second POST and
+    // create a duplicate draft (issue #76).
+    if (saving) {
+      return;
+    }
     setSaving(true);
     const bodyJson = JSON.stringify(editor.getJSON());
     const payload = {
@@ -250,10 +304,10 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
       coverFocalPoint,
     };
 
-    const url = articleId
-      ? `/api/cms/articles/${articleId}`
+    const url = currentId
+      ? `/api/cms/articles/${currentId}`
       : "/api/cms/articles";
-    const method = articleId ? "PUT" : "POST";
+    const method = currentId ? "PUT" : "POST";
 
     const res = await fetch(url, {
       method,
@@ -266,24 +320,14 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
 
     if (res.ok) {
       const data = await res.json();
-      const savedId = articleId || data.id;
-      if (!articleId) {
-        setArticle(data);
+      const savedId: string = currentId ?? data.id;
+      // First create: adopt the server-assigned id so subsequent autosaves
+      // and manual saves PUT against the same record, and reflect the id
+      // in the URL so a reload goes straight to the article's edit URL.
+      if (!currentId) {
+        adoptCreatedArticle(data);
       }
-      // Record version
-      await fetch(`/api/cms/articles/${savedId}/versions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-cms-role": role,
-        },
-        body: JSON.stringify({
-          editor: adminIdFor(role),
-          status: data.status || "draft",
-          bodyJson,
-          summary: "",
-        }),
-      });
+      await recordVersion({ savedId, role, status: data.status, bodyJson });
       await loadVersions(savedId);
       setLastSaved(
         new Date().toLocaleTimeString([], {
@@ -295,6 +339,7 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
     setSaving(false);
   }, [
     editor,
+    saving,
     title,
     jp,
     slug,
@@ -302,12 +347,13 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
     tag,
     author,
     kind,
-    articleId,
+    currentId,
     role,
     coverAssetId,
     coverUrl,
     coverFocalPoint,
     loadVersions,
+    adoptCreatedArticle,
   ]);
 
   // Autosave on content change
@@ -361,14 +407,14 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
               {saving ? "Saving…" : "Save draft"}
             </button>
           )}
-          {articleId &&
+          {currentId &&
             can("publish", role) &&
             article?.status !== "published" && (
               <button
                 className="bg-vermilion px-[14px] py-2 font-mono text-[11px] text-cream uppercase tracking-[0.16em]"
                 onClick={async () => {
                   const res = await fetch(
-                    `/api/cms/articles/${articleId}/publish`,
+                    `/api/cms/articles/${currentId}/publish`,
                     {
                       method: "POST",
                       headers: { "x-cms-role": role },
@@ -376,7 +422,7 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
                   );
                   if (res.ok) {
                     setArticle((a) => (a ? { ...a, status: "published" } : a));
-                    track("admin_article_publish", { articleId });
+                    track("admin_article_publish", { articleId: currentId });
                   }
                 }}
                 type="button"
@@ -384,14 +430,14 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
                 Publish →
               </button>
             )}
-          {articleId &&
+          {currentId &&
             can("unpublish", role) &&
             article?.status === "published" && (
               <button
                 className="border border-ink bg-paper px-[14px] py-2 font-mono text-[11px] text-ink uppercase tracking-[0.16em]"
                 onClick={async () => {
                   const res = await fetch(
-                    `/api/cms/articles/${articleId}/unpublish`,
+                    `/api/cms/articles/${currentId}/unpublish`,
                     {
                       method: "POST",
                       headers: { "x-cms-role": role },
@@ -411,7 +457,7 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
         </>
       }
       active="articles"
-      breadcrumb={`Articles / ${articleId ? "Edit" : "New"}`}
+      breadcrumb={`Articles / ${currentId ? "Edit" : "New"}`}
     >
       <section className="grid grid-cols-[1fr_300px] items-start gap-6 px-8 pt-6 max-[1000px]:grid-cols-1 max-[860px]:px-5">
         {/* Editor */}
@@ -637,7 +683,7 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
           </div>
 
           {/* Version History */}
-          {articleId && (
+          {currentId && (
             <div className="border border-line bg-paper">
               <div className="border-line border-b px-[14px] py-[10px] font-mono text-[10.5px] text-ink uppercase tracking-[0.18em]">
                 Versions · {versions.length}
