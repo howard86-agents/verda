@@ -51,7 +51,9 @@ export function CheckInButton() {
         }
         qc.invalidateQueries({ queryKey: ["checkin-today"] });
         qc.invalidateQueries({ queryKey: ["growth"] });
+        qc.invalidateQueries({ queryKey: ["growth-items"] });
         qc.invalidateQueries({ queryKey: ["ledger"] });
+        qc.invalidateQueries({ queryKey: ["streak"] });
       }
     } finally {
       setLoading(false);
