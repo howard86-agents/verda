@@ -13,6 +13,7 @@ describe("can() policy matrix", () => {
     ["manage_rules", ["admin"], ["editor", "publisher", "customer-service"]],
     ["point_adjust", ["admin", "customer-service"], ["editor", "publisher"]],
     ["member_delete", ["admin"], ["editor", "publisher", "customer-service"]],
+    ["upload_media", ["editor", "publisher", "admin"], ["customer-service"]],
   ];
 
   for (const [action, allowed, denied] of cases) {

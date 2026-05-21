@@ -72,6 +72,16 @@ export interface GrowthRule {
   threshold: number;
 }
 
+export interface MediaAsset {
+  alt: string;
+  blob: Blob;
+  createdAt: string;
+  filename: string;
+  focalPoint?: { x: number; y: number };
+  id: string;
+  mimeType: string;
+}
+
 const db = new Dexie("verda") as Dexie & {
   articles: EntityTable<Article, "id">;
   members: EntityTable<Member, "id">;
@@ -81,6 +91,7 @@ const db = new Dexie("verda") as Dexie & {
   collections: EntityTable<Collection, "id">;
   rewardRules: EntityTable<RewardRule, "id">;
   growthRules: EntityTable<GrowthRule, "level">;
+  mediaAssets: EntityTable<MediaAsset, "id">;
 };
 
 db.version(1).stores({
@@ -92,6 +103,7 @@ db.version(1).stores({
   collections: "++id, memberId, articleId, [memberId+articleId]",
   rewardRules: "id, action",
   growthRules: "level",
+  mediaAssets: "id, filename, mimeType",
 });
 
 export { db };

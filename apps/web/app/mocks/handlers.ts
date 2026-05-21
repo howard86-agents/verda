@@ -118,4 +118,68 @@ export const handlers = [
     }
     return HttpResponse.json({ ok: true });
   }),
+
+  // Media handlers
+  http.get("/api/cms/media", async () => {
+    const assets = await db.mediaAssets.toArray();
+    return HttpResponse.json(
+      assets.map((a) => ({
+        id: a.id,
+        filename: a.filename,
+        mimeType: a.mimeType,
+        alt: a.alt,
+        focalPoint: a.focalPoint,
+        createdAt: a.createdAt,
+        url: URL.createObjectURL(a.blob),
+      }))
+    );
+  }),
+
+  http.post("/api/cms/media", async ({ request }) => {
+    const denied = guardRole(request, "upload_media");
+    if (denied) {
+      return denied;
+    }
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    if (!file) {
+      return HttpResponse.json({ error: "No file" }, { status: 400 });
+    }
+    const alt = (formData.get("alt") as string) || "";
+    const id = `media_${Date.now().toString(36)}`;
+    const asset = {
+      id,
+      filename: file.name,
+      mimeType: file.type,
+      blob: new Blob([await file.arrayBuffer()], { type: file.type }),
+      alt,
+      createdAt: new Date().toISOString(),
+    };
+    await db.mediaAssets.put(asset);
+    return HttpResponse.json(
+      {
+        id: asset.id,
+        filename: asset.filename,
+        mimeType: asset.mimeType,
+        alt: asset.alt,
+        createdAt: asset.createdAt,
+        url: URL.createObjectURL(asset.blob),
+      },
+      { status: 201 }
+    );
+  }),
+
+  http.delete("/api/cms/media/:id", async ({ request, params }) => {
+    const denied = guardRole(request, "upload_media");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    const existing = await db.mediaAssets.get(id);
+    if (!existing) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    await db.mediaAssets.delete(id);
+    return HttpResponse.json({ ok: true });
+  }),
 ];
