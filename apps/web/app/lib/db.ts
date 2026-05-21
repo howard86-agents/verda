@@ -95,6 +95,16 @@ export interface MediaAsset {
   mimeType: string;
 }
 
+export interface ArticleVersion {
+  articleId: string;
+  bodyJson: string;
+  editor: string;
+  id: string;
+  status: string;
+  summary: string;
+  timestamp: string;
+}
+
 const db = new Dexie("verda") as Dexie & {
   articles: EntityTable<Article, "id">;
   members: EntityTable<Member, "id">;
@@ -107,6 +117,7 @@ const db = new Dexie("verda") as Dexie & {
   rewardRules: EntityTable<RewardRule, "id">;
   growthRules: EntityTable<GrowthRule, "level">;
   mediaAssets: EntityTable<MediaAsset, "id">;
+  articleVersions: EntityTable<ArticleVersion, "id">;
 };
 
 db.version(1).stores({
@@ -122,6 +133,7 @@ db.version(1).stores({
   rewardRules: "id, action",
   growthRules: "level",
   mediaAssets: "id, filename, mimeType",
+  articleVersions: "id, articleId, timestamp",
 });
 
 export { db };
