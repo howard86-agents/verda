@@ -43,6 +43,13 @@ const NAV = [
     href: "/collection",
     match: (p: string) => p.startsWith("/collection"),
   },
+  {
+    id: "about",
+    en: "About",
+    jp: "誌",
+    href: "/about",
+    match: (p: string) => p.startsWith("/about"),
+  },
 ];
 
 function ThemeToggle() {
