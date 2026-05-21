@@ -4,6 +4,75 @@ import { can } from "@/lib/cms-auth";
 import { db } from "@/lib/db";
 import { levelFor } from "@/lib/rewards";
 
+async function handleCheckIn(memberId: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  const logs = await db.behaviorLogs
+    .where("memberId")
+    .equals(memberId)
+    .toArray();
+  const alreadyToday = logs.some(
+    (l) => l.action === "check_in" && l.createdAt.slice(0, 10) === today
+  );
+
+  if (alreadyToday) {
+    return HttpResponse.json(
+      { error: "Already checked in today" },
+      { status: 409 }
+    );
+  }
+
+  const rule = await db.rewardRules
+    .where("action")
+    .equals("daily_check_in")
+    .first();
+  const pts = rule?.enabled ? rule.points : 0;
+
+  const ledger = await db.pointLedger
+    .where("memberId")
+    .equals(memberId)
+    .toArray();
+  const currentBalance =
+    ledger.length > 0 ? Math.max(...ledger.map((e) => e.balanceAfter)) : 0;
+  const newBalance = currentBalance + pts;
+
+  await db.behaviorLogs.add({
+    memberId,
+    action: "check_in",
+    createdAt: new Date().toISOString(),
+  });
+
+  if (pts > 0) {
+    await db.pointLedger.add({
+      memberId,
+      amount: pts,
+      balanceAfter: newBalance,
+      reason: "Daily check-in",
+      createdAt: new Date().toISOString(),
+    });
+
+    const rules = await db.growthRules.toArray();
+    const newLevel = levelFor(newBalance, rules);
+    const growthItem = await db.growthItems
+      .where("memberId")
+      .equals(memberId)
+      .first();
+    if (growthItem?.id) {
+      await db.growthItems.update(growthItem.id, {
+        nutrients: newBalance,
+        level: newLevel,
+      });
+    } else {
+      await db.growthItems.add({
+        memberId,
+        nutrients: newBalance,
+        level: newLevel,
+      });
+    }
+  }
+
+  return HttpResponse.json({ ok: true, points: pts, balance: newBalance });
+}
+
 function getRoleFromHeader(request: Request): CmsRole {
   return (request.headers.get("x-cms-role") as CmsRole) || "editor";
 }
@@ -278,6 +347,10 @@ export const handlers = [
         balance: newBalance,
         level: newLevel,
       });
+    }
+
+    if (action === "check_in") {
+      return handleCheckIn(memberId);
     }
 
     return HttpResponse.json({ ok: true });
