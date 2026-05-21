@@ -9,6 +9,52 @@ import { db } from "./db";
 
 const SEED_KEY = "verda.seeded";
 
+const PUBLIC_IMAGES = [
+  { path: "/img/stories/s01.webp", filename: "s01.webp" },
+  { path: "/img/stories/s02.webp", filename: "s02.webp" },
+  { path: "/img/stories/s03.webp", filename: "s03.webp" },
+  { path: "/img/stories/s04.webp", filename: "s04.webp" },
+  { path: "/img/stories/s05.webp", filename: "s05.webp" },
+  { path: "/img/stories/s06.webp", filename: "s06.webp" },
+  { path: "/img/social/r01.webp", filename: "r01.webp" },
+  { path: "/img/social/r02.webp", filename: "r02.webp" },
+  { path: "/img/social/r03.webp", filename: "r03.webp" },
+];
+
+async function seedMedia() {
+  const count = await db.mediaAssets.count();
+  if (count > 0) {
+    return;
+  }
+  const assets = await Promise.all(
+    PUBLIC_IMAGES.map(async (img, i) => {
+      try {
+        const res = await fetch(img.path);
+        if (!res.ok) {
+          return null;
+        }
+        const blob = await res.blob();
+        return {
+          id: `seed_${i + 1}`,
+          filename: img.filename,
+          mimeType: "image/webp",
+          blob,
+          alt: img.filename.replace(".webp", ""),
+          createdAt: new Date().toISOString(),
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+  const valid = assets.filter(Boolean) as NonNullable<
+    (typeof assets)[number]
+  >[];
+  if (valid.length > 0) {
+    await db.mediaAssets.bulkPut(valid);
+  }
+}
+
 export async function seedIfEmpty() {
   if (typeof window === "undefined") {
     return;
@@ -121,6 +167,8 @@ export async function seedIfEmpty() {
       name: t,
     }))
   );
+
+  await seedMedia();
 
   localStorage.setItem(SEED_KEY, "1");
 }

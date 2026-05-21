@@ -3,12 +3,14 @@
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
+import Youtube from "@tiptap/extension-youtube";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CATEGORIES } from "@verda/data";
 import NextLink from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CmsShell } from "@/_components/cms-shell";
+import { MediaPicker } from "@/_components/media-picker";
 import { can, useCmsAuth } from "@/lib/cms-auth";
 import { track } from "@/lib/track";
 
@@ -16,6 +18,9 @@ interface ArticleData {
   author: string;
   bodyJson: string;
   cat: string;
+  coverAssetId?: string;
+  coverFocalPoint?: { x: number; y: number };
+  coverUrl?: string;
   id: string;
   jp: string;
   kind: string;
@@ -47,6 +52,90 @@ function ToolbarBtn({
   );
 }
 
+function CoverPreview({
+  canEdit,
+  coverFocalPoint,
+  coverUrl,
+  onRemove,
+  onSetFocal,
+}: {
+  canEdit: boolean;
+  coverFocalPoint: { x: number; y: number };
+  coverUrl: string;
+  onRemove: () => void;
+  onSetFocal: (fp: { x: number; y: number }) => void;
+}) {
+  return (
+    <div className="relative">
+      <button
+        aria-label="Set focal point"
+        className="block w-full cursor-crosshair border-0 bg-transparent p-0"
+        disabled={!canEdit}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+          const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+          onSetFocal({ x, y });
+        }}
+        type="button"
+      >
+        {/* biome-ignore lint/performance/noImgElement: blob URLs incompatible with next/image */}
+        {/* biome-ignore lint/correctness/useImageSize: dynamic cover preview */}
+        <img
+          alt="Cover"
+          className="aspect-[16/9] w-full border border-line object-cover"
+          src={coverUrl}
+          style={{
+            objectPosition: `${coverFocalPoint.x}% ${coverFocalPoint.y}%`,
+          }}
+        />
+      </button>
+      <span
+        className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-vermilion bg-cream/80"
+        style={{
+          left: `${coverFocalPoint.x}%`,
+          top: `${coverFocalPoint.y}%`,
+        }}
+      />
+      <div className="mt-2 flex items-center justify-between">
+        <span className="font-mono text-[9px] text-muted">
+          Focal: {coverFocalPoint.x}%, {coverFocalPoint.y}%
+        </span>
+        {canEdit && (
+          <button
+            className="font-mono text-[9px] text-vermilion uppercase"
+            onClick={onRemove}
+            type="button"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CoverPlaceholder({
+  canEdit,
+  onPick,
+}: {
+  canEdit: boolean;
+  onPick: () => void;
+}) {
+  if (!canEdit) {
+    return <span className="font-mono text-[10px] text-muted">No cover</span>;
+  }
+  return (
+    <button
+      className="w-full border border-line border-dashed py-4 font-mono text-[10px] text-muted uppercase tracking-[0.12em]"
+      onClick={onPick}
+      type="button"
+    >
+      + Set cover image
+    </button>
+  );
+}
+
 export function ArticleEditor({ articleId }: { articleId: string | null }) {
   const { role } = useCmsAuth();
   const [article, setArticle] = useState<ArticleData | null>(null);
@@ -59,6 +148,15 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
   const [kind, setKind] = useState("brand");
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [coverAssetId, setCoverAssetId] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [coverFocalPoint, setCoverFocalPoint] = useState<{
+    x: number;
+    y: number;
+  }>({ x: 50, y: 50 });
+  const [showMediaPicker, setShowMediaPicker] = useState<
+    "cover" | "inline" | null
+  >(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editor = useEditor({
@@ -68,6 +166,7 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
       }),
       Link.configure({ openOnClick: false }),
       Image,
+      Youtube.configure({ controls: true }),
       Placeholder.configure({ placeholder: "Start writing…" }),
     ],
     content: "",
@@ -90,6 +189,15 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
         setTag(data.tag);
         setAuthor(data.author);
         setKind(data.kind);
+        if (data.coverAssetId) {
+          setCoverAssetId(data.coverAssetId);
+        }
+        if (data.coverUrl) {
+          setCoverUrl(data.coverUrl);
+        }
+        if (data.coverFocalPoint) {
+          setCoverFocalPoint(data.coverFocalPoint);
+        }
         if (data.bodyJson && editor) {
           try {
             editor.commands.setContent(JSON.parse(data.bodyJson));
@@ -106,7 +214,19 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
     }
     setSaving(true);
     const bodyJson = JSON.stringify(editor.getJSON());
-    const payload = { title, jp, slug, cat, tag, author, kind, bodyJson };
+    const payload = {
+      title,
+      jp,
+      slug,
+      cat,
+      tag,
+      author,
+      kind,
+      bodyJson,
+      coverAssetId: coverAssetId || undefined,
+      coverUrl: coverUrl || undefined,
+      coverFocalPoint,
+    };
 
     const url = articleId
       ? `/api/cms/articles/${articleId}`
@@ -135,7 +255,21 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
       );
     }
     setSaving(false);
-  }, [editor, title, jp, slug, cat, tag, author, kind, articleId, role]);
+  }, [
+    editor,
+    title,
+    jp,
+    slug,
+    cat,
+    tag,
+    author,
+    kind,
+    articleId,
+    role,
+    coverAssetId,
+    coverUrl,
+    coverFocalPoint,
+  ]);
 
   // Autosave on content change
   useEffect(() => {
@@ -291,16 +425,19 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
                 Link
               </ToolbarBtn>
               <span className="h-[14px] w-px bg-line" />
+              <ToolbarBtn onClick={() => setShowMediaPicker("inline")}>
+                + Image
+              </ToolbarBtn>
               <ToolbarBtn
                 onClick={() => {
                   // biome-ignore lint/suspicious/noAlert: dev-only CMS tool
-                  const url = window.prompt("Image URL:");
+                  const url = window.prompt("YouTube URL:");
                   if (url) {
-                    editor.chain().focus().setImage({ src: url }).run();
+                    editor.commands.setYoutubeVideo({ src: url });
                   }
                 }}
               >
-                + Image
+                Video
               </ToolbarBtn>
               <span className="ml-auto font-mono text-[10px] text-muted tracking-[0.1em]">
                 {lastSaved ? `↺ saved · ${lastSaved}` : ""}
@@ -338,6 +475,32 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
 
         {/* Sidebar */}
         <aside className="flex flex-col gap-4">
+          {/* Cover image */}
+          <div className="border border-line bg-paper">
+            <div className="border-line border-b px-[14px] py-[10px] font-mono text-[10.5px] text-ink uppercase tracking-[0.18em]">
+              Cover Image
+            </div>
+            <div className="px-[14px] py-3">
+              {coverUrl ? (
+                <CoverPreview
+                  canEdit={canEdit}
+                  coverFocalPoint={coverFocalPoint}
+                  coverUrl={coverUrl}
+                  onRemove={() => {
+                    setCoverAssetId(null);
+                    setCoverUrl(null);
+                  }}
+                  onSetFocal={setCoverFocalPoint}
+                />
+              ) : (
+                <CoverPlaceholder
+                  canEdit={canEdit}
+                  onPick={() => setShowMediaPicker("cover")}
+                />
+              )}
+            </div>
+          </div>
+
           {/* Status */}
           <div className="border border-line bg-paper">
             <div className="border-line border-b px-[14px] py-[10px] font-mono text-[10.5px] text-ink uppercase tracking-[0.18em]">
@@ -427,6 +590,24 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
         </aside>
       </section>
       <div className="h-10" />
+      {showMediaPicker && (
+        <MediaPicker
+          onClose={() => setShowMediaPicker(null)}
+          onSelect={(asset) => {
+            if (showMediaPicker === "cover") {
+              setCoverAssetId(asset.id);
+              setCoverUrl(asset.url);
+            } else if (showMediaPicker === "inline" && editor) {
+              editor
+                .chain()
+                .focus()
+                .setImage({ src: asset.url, alt: asset.alt })
+                .run();
+            }
+            setShowMediaPicker(null);
+          }}
+        />
+      )}
     </CmsShell>
   );
 }

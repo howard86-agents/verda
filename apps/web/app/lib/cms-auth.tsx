@@ -18,7 +18,8 @@ export type CmsAction =
   | "manage_taxonomy"
   | "manage_rules"
   | "point_adjust"
-  | "member_delete";
+  | "member_delete"
+  | "upload_media";
 
 const POLICY: Record<CmsAction, CmsRole[]> = {
   create_draft: ["editor", "publisher", "admin"],
@@ -29,6 +30,7 @@ const POLICY: Record<CmsAction, CmsRole[]> = {
   manage_rules: ["admin"],
   point_adjust: ["admin", "customer-service"],
   member_delete: ["admin"],
+  upload_media: ["editor", "publisher", "admin"],
 };
 
 export function can(action: CmsAction, role: CmsRole): boolean {
