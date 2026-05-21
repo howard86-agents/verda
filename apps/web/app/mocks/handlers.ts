@@ -7,7 +7,66 @@ import {
   GROWTH_CONFIG_DEFAULT_ID,
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
 } from "@/lib/db";
+import {
+  buildRedemption,
+  checkEligibility,
+  mockRewardFor,
+} from "@/lib/redemption";
 import { allocateGrowthForMember, awardPoints, levelFor } from "@/lib/rewards";
+
+async function handleRedemption(body: {
+  growthItemId?: number;
+  memberId?: string;
+}) {
+  const { memberId, growthItemId } = body;
+  if (!memberId || typeof growthItemId !== "number") {
+    return HttpResponse.json(
+      { error: "memberId and growthItemId required" },
+      { status: 400 }
+    );
+  }
+
+  const item = await db.growthItems.get(growthItemId);
+  if (!item) {
+    return HttpResponse.json(
+      { error: "Growth item not found" },
+      { status: 404 }
+    );
+  }
+  if (item.memberId !== memberId) {
+    return HttpResponse.json(
+      { error: "Growth item does not belong to this member" },
+      { status: 403 }
+    );
+  }
+
+  const existing = await db.redemptions
+    .where("growthItemId")
+    .equals(growthItemId)
+    .toArray();
+
+  const eligibility = checkEligibility(item, existing);
+  if (!eligibility.ok) {
+    const status = eligibility.reason === "not_completed" ? 400 : 409;
+    return HttpResponse.json(
+      { error: "Redemption not allowed", reason: eligibility.reason },
+      { status }
+    );
+  }
+
+  const now = new Date().toISOString();
+  const payload = mockRewardFor(item, now);
+  const id = `red_${Date.now().toString(36)}`;
+  const redemption = buildRedemption({ id, item, payload, now });
+
+  await db.redemptions.put(redemption);
+  await db.growthItems.update(growthItemId, {
+    redeemedAt: now,
+    redemptionId: id,
+  });
+
+  return HttpResponse.json({ ok: true, redemption });
+}
 
 async function handleCheckIn(memberId: string) {
   const today = new Date().toISOString().slice(0, 10);
@@ -552,6 +611,14 @@ export const handlers = [
     }
 
     return HttpResponse.json({ ok: true });
+  }),
+
+  http.post("/api/redemptions", async ({ request }) => {
+    const body = (await request.json()) as {
+      growthItemId?: number;
+      memberId?: string;
+    };
+    return handleRedemption(body);
   }),
 
   http.post("/api/events", async ({ request }) => {

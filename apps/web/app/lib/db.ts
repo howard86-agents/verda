@@ -69,6 +69,11 @@ export interface PointLedger {
  * threshold it is marked completed and the overflow seeds the next item,
  * provided the cap has not been reached.
  *
+ * Once completed, an item becomes redeemable (issue #35); after redemption
+ * the item stays in the collection (kept, not consumed) and gains a
+ * `redeemedAt` timestamp plus the `redemptionId` of the row in the
+ * `redemptions` table.
+ *
  * `sequence` is a 1-based index per member used for display ("Plant 01",
  * "Plant 02", …) and to disambiguate items with identical timestamps.
  */
@@ -81,8 +86,48 @@ export interface GrowthItem {
   level: number;
   memberId: string;
   nutrients: number;
+  /** ISO timestamp the item was redeemed (issue #35). */
+  redeemedAt?: string;
+  /** FK to the `redemptions.id` row that recorded this redemption. */
+  redemptionId?: string;
   /** 1-based per-member display order: Plant 01, Plant 02, … */
   sequence?: number;
+}
+
+/**
+ * Reward provider tag (issue #35). Starts mocked; the real fulfillment
+ * targets (coupon, 91APP, external) plug in behind the same payload shape.
+ */
+export type RedemptionProvider = "mock" | "coupon" | "91app" | "external";
+
+/**
+ * A redemption record — created when a member redeems a fully-grown
+ * growth item (issue #35). Per-member, per-`growthItemId`; duplicates
+ * for the same growth item are rejected by the API.
+ *
+ * The reward fields here mirror the future fulfillment payload shape so
+ * the UI and analytics surface stay stable as the provider switches
+ * from `mock` to a real coupon / 91APP / external integration.
+ */
+export interface Redemption {
+  createdAt: string;
+  /** Optional user-facing reward title. */
+  displayName?: string;
+  /** Optional ISO timestamp when the reward expires. */
+  expiresAt?: string;
+  /** Optional external/coupon/91APP reference. Null/unset for the mock. */
+  fulfillmentRef?: string | null;
+  /** The completed growth item this redemption is for. */
+  growthItemId: number;
+  /** Snapshot of the item's display sequence at redemption time. */
+  growthItemSequence: number;
+  id: string;
+  memberId: string;
+  /** Optional provider-specific JSON-safe details. */
+  metadata?: Record<string, unknown>;
+  provider: RedemptionProvider;
+  /** Mocked or real reward code, e.g. "VERDA-PLANT-01". */
+  rewardCode: string;
 }
 
 export interface Collection {
@@ -172,6 +217,7 @@ const db = new Dexie("verda") as Dexie & {
   mediaAssets: EntityTable<MediaAsset, "id">;
   articleVersions: EntityTable<ArticleVersion, "id">;
   auditLog: EntityTable<AuditLog, "id">;
+  redemptions: EntityTable<Redemption, "id">;
 };
 
 db.version(1).stores({
@@ -224,5 +270,15 @@ db.version(3)
         }
       });
   });
+
+// v4 — issue #35: growth-item redemption.
+// Adds the `redemptions` table indexed by member and growth item, with a
+// uniqueness index on `growthItemId` so duplicate redemption attempts for
+// the same item are rejected at the storage layer too. The new optional
+// fields on GrowthItem (`redeemedAt`, `redemptionId`) are additive and
+// don't need their own indexes.
+db.version(4).stores({
+  redemptions: "id, memberId, &growthItemId, createdAt",
+});
 
 export { db };
