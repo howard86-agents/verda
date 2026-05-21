@@ -27,12 +27,64 @@ export const handlers = [
     return HttpResponse.json(articles);
   }),
 
-  http.post("/api/cms/articles", ({ request }) => {
+  http.get("/api/cms/articles", async () => {
+    const articles = await db.articles.toArray();
+    return HttpResponse.json(articles);
+  }),
+
+  http.get("/api/cms/articles/:id", async ({ params }) => {
+    const article = await db.articles.get(params.id as string);
+    if (!article) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return HttpResponse.json(article);
+  }),
+
+  http.post("/api/cms/articles", async ({ request }) => {
     const denied = guardRole(request, "create_draft");
     if (denied) {
       return denied;
     }
-    return HttpResponse.json({ ok: true }, { status: 201 });
+    const body = (await request.json()) as Record<string, unknown>;
+    const id = `a_${Date.now().toString(36)}`;
+    const article = {
+      id,
+      slug: (body.slug as string) || id,
+      kind: (body.kind as string) || "brand",
+      cat: (body.cat as string) || "",
+      tag: (body.tag as string) || "",
+      title: (body.title as string) || "Untitled",
+      jp: (body.jp as string) || "",
+      sum: (body.sum as string) || "",
+      img: (body.img as string) || "",
+      imagePrompt: "",
+      imageSeed: 0,
+      read: 0,
+      date: new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      author: (body.author as string) || "",
+      status: "draft",
+      bodyJson: (body.bodyJson as string) || "",
+    };
+    await db.articles.put(article);
+    return HttpResponse.json(article, { status: 201 });
+  }),
+
+  http.put("/api/cms/articles/:id", async ({ request, params }) => {
+    const denied = guardRole(request, "edit_draft");
+    if (denied) {
+      return denied;
+    }
+    const existing = await db.articles.get(params.id as string);
+    if (!existing) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as Record<string, unknown>;
+    const updated = { ...existing, ...body, id: existing.id };
+    await db.articles.put(updated);
+    return HttpResponse.json(updated);
   }),
 
   http.post("/api/cms/articles/:id/publish", ({ request }) => {
