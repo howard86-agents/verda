@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { GrowthLevel } from "@verda/data";
 import { GROWTH_LEVELS } from "@verda/data";
 import { AuthGate } from "@/_components/auth-gate";
+import { CheckInButton } from "@/_components/check-in-button";
 import { Eyebrow } from "@/_components/eyebrow";
 import { IconDrop } from "@/_components/glyphs";
 import { Plant } from "@/_components/plant";
@@ -71,9 +72,12 @@ export default function Page() {
               {currentLevelData?.name ?? "Seed"}
               <span className="text-vermilion">.</span>
             </h1>
-            <div className="font-display text-[22px] text-muted italic">
-              {currentLevelData?.jp ?? "種"} — Lv{" "}
-              {String(level).padStart(2, "0")}
+            <div className="flex items-center gap-4">
+              <div className="font-display text-[22px] text-muted italic">
+                {currentLevelData?.jp ?? "種"} — Lv{" "}
+                {String(level).padStart(2, "0")}
+              </div>
+              <CheckInButton />
             </div>
           </div>
         </section>
