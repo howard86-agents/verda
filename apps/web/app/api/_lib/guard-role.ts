@@ -38,9 +38,24 @@ async function resolveRole(request: Request): Promise<CmsRole | null> {
     const sessionRole = session?.user?.role;
     return mapSessionRole(sessionRole);
   }
-  // Mock mode: trust the header for local dev impersonation
-  const header = request.headers.get("x-cms-role") as CmsRole | null;
-  return header || "editor";
+  // Mock mode: trust only recognized local-dev impersonation roles.
+  const header = request.headers.get("x-cms-role");
+  if (header) {
+    return mapHeaderRole(header);
+  }
+  return "editor";
+}
+
+function mapHeaderRole(role: string | null): CmsRole | null {
+  switch (role) {
+    case "editor":
+    case "publisher":
+    case "admin":
+    case "customer-service":
+      return role;
+    default:
+      return null;
+  }
 }
 
 function mapSessionRole(role: string | undefined): CmsRole | null {
