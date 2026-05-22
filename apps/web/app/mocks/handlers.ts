@@ -288,7 +288,13 @@ async function applyBatchAction(
   }
 }
 
-export const handlers = [
+// The Dexie-backed handlers for `/api/stories` and `/api/stories/:slug`
+// are factored out so `mocks/browser.ts` can opt them out when
+// `NEXT_PUBLIC_API_MODE=real` (issue #126). With the migrated handlers
+// dropped, MSW falls through (`onUnhandledRequest: "bypass"`) and the
+// real Postgres-backed Route Handlers under `app/api/stories/...`
+// serve the request instead.
+export const migratedStoriesHandlers = [
   http.get("/api/stories", async ({ request }) => {
     await promoteDueScheduled();
     const url = new URL(request.url);
@@ -336,6 +342,22 @@ export const handlers = [
       totalPages: Math.ceil(total / limit),
     });
   }),
+
+  http.get("/api/stories/:slug", async ({ params }) => {
+    const { slug } = params;
+    const article = await db.articles
+      .where("slug")
+      .equals(slug as string)
+      .first();
+    if (!article) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return HttpResponse.json(article);
+  }),
+];
+
+export const handlers = [
+  ...migratedStoriesHandlers,
 
   http.get("/api/cms/articles", async () => {
     await promoteDueScheduled();
@@ -651,18 +673,6 @@ export const handlers = [
       const status = msg.includes("not found") ? 404 : 400;
       return HttpResponse.json({ error: msg }, { status });
     }
-  }),
-
-  http.get("/api/stories/:slug", async ({ params }) => {
-    const { slug } = params;
-    const article = await db.articles
-      .where("slug")
-      .equals(slug as string)
-      .first();
-    if (!article) {
-      return HttpResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    return HttpResponse.json(article);
   }),
 
   // Public reader profile (issue #103) — composes the member, their
