@@ -19,6 +19,7 @@ import {
 } from "@/lib/db";
 import { maxThresholdFor } from "@/lib/growth-allocation";
 import { levelFor } from "@/lib/rewards";
+import { computeStreak } from "@/lib/streak";
 import { track } from "@/lib/track";
 
 const CORNERS = [
@@ -456,6 +457,20 @@ export default function Page() {
     },
   });
 
+  // Consecutive-day streak (issue #92). Driven by check_in /
+  // read_complete entries in the behavior log; refetches whenever the
+  // ledger does so a fresh check-in flips the counter without a manual
+  // invalidate.
+  const { data: streak = 0 } = useQuery({
+    queryKey: ["streak", member?.id],
+    enabled: !!member,
+    queryFn: async () => {
+      const id = member?.id ?? "";
+      const logs = await db.behaviorLogs.where("memberId").equals(id).toArray();
+      return computeStreak(logs);
+    },
+  });
+
   const sortedRules = [...growthRules].sort((a, b) => a.level - b.level);
   const maxThreshold = maxThresholdFor(sortedRules) || 300;
 
@@ -500,6 +515,16 @@ export default function Page() {
             {atCap && (
               <span className="ml-3 text-vermilion">At max — keep tending</span>
             )}
+            <span
+              className="ml-4 inline-flex items-center gap-[6px] border-line border-l pl-3"
+              role="status"
+            >
+              <span aria-hidden>🔥</span>
+              <span className="text-ink">
+                Streak {streak} day{streak === 1 ? "" : "s"}
+              </span>
+              <span className="text-muted normal-case">· 連続</span>
+            </span>
           </div>
         </section>
 
