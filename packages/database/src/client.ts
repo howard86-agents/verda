@@ -11,7 +11,7 @@ export type { Article, Prisma, Section } from "../generated/client";
 // pre-constructed `pg.Pool` instance. The adapter ships its own pinned
 // `pg` and uses an `instanceof Pool` check; if the host package
 // resolves a different `pg` minor (which Bun's hoisting can do in a
-// monorepo), the instance check misses and the adapter mis-typed the
+// monorepo), the instance check misses and the adapter mistyped the
 // pool object as a config bag, blowing up at connect time. The string
 // form sidesteps the version-skew failure mode entirely while still
 // letting the adapter own the Pool's lifecycle.
