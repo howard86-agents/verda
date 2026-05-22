@@ -1,15 +1,14 @@
 "use client";
 
-import { MEMBER } from "@verda/data";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { signIn, signOut, useSession } from "next-auth/react";
+import { useCallback, useMemo } from "react";
 
+/**
+ * Shape consumed by the existing reader UI (issue #127). The fields
+ * mirror the legacy localStorage stub so callers in
+ * `_components/*.tsx`, `(site)/.../page.tsx`, and friends round-trip
+ * unchanged when the implementation flips onto Auth.js v5.
+ */
 export interface AuthMember {
   email: string;
   id: string;
@@ -23,48 +22,66 @@ interface AuthCtx {
   member: AuthMember | null;
 }
 
-const AuthContext = createContext<AuthCtx | null>(null);
+/**
+ * Default email used by the in-product "Sign in" button in
+ * `top-nav.tsx` and `auth-gate.tsx`. The legacy stub logged the user
+ * in as the seeded `MEMBER` (Mira Tanaka) immediately; we preserve
+ * that behaviour by passing her email to the Credentials provider.
+ * A future slice (#127's follow-on or a real magic-link flow) can
+ * surface a real form.
+ */
+const DEFAULT_DEMO_EMAIL = "mira.t@example.com";
 
-const AUTH_KEY = "verda.auth";
+function deriveInitial(name: string | null | undefined, email: string): string {
+  const trimmed = (name ?? "").trim();
+  if (trimmed.length > 0) {
+    return trimmed.charAt(0).toUpperCase();
+  }
+  return email.charAt(0).toUpperCase();
+}
 
-const SEEDED_MEMBER: AuthMember = {
-  id: MEMBER.memberId,
-  name: MEMBER.name,
-  email: MEMBER.email,
-  initial: MEMBER.initial,
-};
+/**
+ * `useAuth()` is a thin shim over `useSession()` (issue #127). It
+ * collapses Auth.js's `{ data, status }` shape into the legacy
+ * `{ member, login, logout }` interface so every caller in
+ * `_components/`, `(site)/`, and `lib/use-collection.ts` keeps
+ * working. The client component tree stays unchanged.
+ */
+export function useAuth(): AuthCtx {
+  const { data: session } = useSession();
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [member, setMember] = useState<AuthMember | null>(null);
-
-  useEffect(() => {
-    if (localStorage.getItem(AUTH_KEY) === "1") {
-      setMember(SEEDED_MEMBER);
+  const member = useMemo<AuthMember | null>(() => {
+    if (!session?.user?.email) {
+      return null;
     }
-  }, []);
+    const id = session.user.id ?? "";
+    if (!id) {
+      return null;
+    }
+    return {
+      id,
+      email: session.user.email,
+      name: session.user.name ?? "",
+      initial: deriveInitial(session.user.name, session.user.email),
+    };
+  }, [session]);
 
   const login = useCallback(() => {
-    setMember(SEEDED_MEMBER);
-    localStorage.setItem(AUTH_KEY, "1");
+    signIn("credentials", {
+      email: DEFAULT_DEMO_EMAIL,
+      redirect: false,
+    }).catch(() => {
+      // Sign-in failures surface via `useSession()` returning a
+      // null user; we don't gate the UI on the call's resolution.
+    });
   }, []);
 
   const logout = useCallback(() => {
-    setMember(null);
-    localStorage.removeItem(AUTH_KEY);
+    signOut({ redirect: false }).catch(() => {
+      // Same rationale as `login`: any failure leaves the session
+      // untouched, which is the safe default.
+    });
   }, []);
 
-  const value = useMemo(
-    () => ({ member, login, logout }),
-    [member, login, logout]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthCtx {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return ctx;
+  return { member, login, logout };
 }

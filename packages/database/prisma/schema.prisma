@@ -82,3 +82,108 @@ model Article {
   @@index([status])
   @@map("articles")
 }
+
+/// Identity role exposed as a JWT claim by the Auth.js callbacks
+/// (issue #127). `reader` is the default for any user who signs in
+/// through the public flow; staff roles map onto the existing CMS
+/// permission matrix in `apps/web/app/lib/cms-auth.tsx`.
+enum Role {
+  reader
+  editor
+  publisher
+  admin
+  customer_service
+}
+
+/// Auth.js v5 identity row. `id` is intentionally *not* `@default(cuid())`
+/// because the seed wires reader users to the existing
+/// `m_4421` / `m_5102` / … ids the in-browser Dexie store uses, so
+/// the JWT `sub` claim round-trips into legacy reader UI without
+/// rewriting every component.
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(reader)
+
+  accounts      Account[]
+  sessions      Session[]
+  memberProfile MemberProfile?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+/// Auth.js v5 OAuth account row. Required by the Prisma adapter even
+/// when only the Credentials provider is wired up — the adapter still
+/// upserts the account model on linking flows.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+/// Auth.js v5 session row. Unused by the JWT session strategy at
+/// runtime but the Prisma adapter still demands the table exists.
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Auth.js v5 verification token row. Drives the email-magic-link
+/// flow when SMTP lands in a later slice; included now so the
+/// adapter has the schema it expects.
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+/// Public-facing reader profile attached to a `User` 1:1 (issue #127).
+/// Holds the gamification-related identity bits (`displayName`,
+/// `joined`) and reserves a slot for the nutrient/level state later
+/// slices (#130 gamification core, #131 reader engagement) populate.
+/// Staff users without a reader-side surface skip this row.
+model MemberProfile {
+  id          String @id @default(cuid())
+  userId      String @unique
+  displayName String
+  joined      String @default("")
+  initial     String @default("")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("member_profiles")
+}
