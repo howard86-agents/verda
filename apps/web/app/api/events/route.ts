@@ -96,8 +96,13 @@ async function handleCheckIn(userId: string): Promise<Response> {
 /**
  * Award points for an action in a single transaction.
  * Returns null if the action was already rewarded (idempotency).
+ *
+ * Exported so other Route Handlers (issue #133's submission approval
+ * flow) can run the same award path without re-implementing the
+ * reward-rule lookup, behaviour-log idempotency guard, and growth
+ * allocation transaction.
  */
-async function awardPoints(
+export async function awardPoints(
   userId: string,
   action: string,
   articleId?: string

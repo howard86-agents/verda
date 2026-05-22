@@ -429,8 +429,164 @@ export const migratedReaderProfileHandlers = [
   }),
 ];
 
+// Reader submissions + CMS approval queue (issue #133). Same pattern
+// as `migratedGrowthHandlers`/`migratedStoriesHandlers`: when
+// `NEXT_PUBLIC_API_MODE=real` these handlers are dropped so the
+// requests bypass MSW and hit the real Postgres-backed Route Handlers
+// at `apps/web/app/api/readers/submissions/route.ts` and
+// `apps/web/app/api/cms/submissions/...`.
+export const migratedSubmissionHandlers = [
+  // Public reader-submission endpoint (issue #91). Auth-gated by
+  // requiring a memberId on the body — UI is also gated, this mirror
+  // is so the storage record never lands without attribution. The
+  // handler trusts the body's memberId because the public app's
+  // session is mocked client-side; no SSR auth to verify.
+  http.post("/api/readers/submissions", async ({ request }) => {
+    const body = (await request.json()) as {
+      bodyJson?: string;
+      coverFocalPoint?: { x: number; y: number };
+      coverUrl?: string;
+      memberId?: string;
+      title?: string;
+    };
+    if (!body.memberId) {
+      return HttpResponse.json({ error: "Sign in to submit" }, { status: 401 });
+    }
+    try {
+      const article = await createSubmission({
+        memberId: body.memberId,
+        draft: {
+          title: body.title ?? "",
+          bodyJson: body.bodyJson ?? "",
+          coverUrl: body.coverUrl,
+          coverFocalPoint: body.coverFocalPoint,
+        },
+      });
+      return HttpResponse.json(article, { status: 201 });
+    } catch (e) {
+      return HttpResponse.json(
+        { error: e instanceof Error ? e.message : "Submission failed" },
+        { status: 400 }
+      );
+    }
+  }),
+
+  // CMS submission approval queue (issue #102). Listing returns
+  // pending reader-contributed articles for the moderation desk;
+  // approve flips the row to published (status===published is the
+  // sentinel the public Readers listing already filters on), reject
+  // sets a 'rejected' status that stays out of the public listing
+  // too. Both mutations are role-guarded by the existing `publish`
+  // policy so only publishers + admins can act.
+  http.get("/api/cms/submissions", async () => {
+    const pending = await db.articles
+      .where("kind")
+      .equals("submission")
+      .filter((a) => a.status === "pending")
+      .toArray();
+    pending.sort((a, b) => b.date.localeCompare(a.date));
+    // Enrich with the submitter's display name so the list doesn't
+    // need a follow-up join.
+    const ids = [
+      ...new Set(
+        pending.map((a) => a.submittedBy).filter((id): id is string => !!id)
+      ),
+    ];
+    const members = ids.length
+      ? await db.members.where("id").anyOf(ids).toArray()
+      : [];
+    const memberById = new Map(members.map((m) => [m.id, m]));
+    return HttpResponse.json({
+      items: pending.map((a) => ({
+        id: a.id,
+        title: a.title,
+        slug: a.slug,
+        submittedAt: a.date,
+        submittedBy: a.submittedBy ?? null,
+        submitterName: a.submittedBy
+          ? (memberById.get(a.submittedBy)?.name ?? a.submittedBy)
+          : "Anonymous",
+        kind: a.kind,
+      })),
+      total: pending.length,
+    });
+  }),
+
+  http.post("/api/cms/submissions/:id/approve", async ({ request, params }) => {
+    const denied = guardRole(request, "publish");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    const existing = await db.articles.get(id);
+    if (!existing) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (existing.kind !== "submission") {
+      return HttpResponse.json(
+        { error: "Article is not a reader submission" },
+        { status: 400 }
+      );
+    }
+    await db.articles.update(id, {
+      status: "published",
+      publishedAt: new Date().toISOString(),
+    });
+    const updated = await db.articles.get(id);
+    // Community reward (issue #104). Awarding through the standard
+    // pipeline writes a behaviorLog + ledger entry and allocates the
+    // delta to the submitter's growth item. The `per-article` limit on
+    // `rr_submission_approved` ensures re-approval (e.g. unpublish →
+    // approve again) doesn't double-award. Disabled rules silently
+    // award zero, satisfying the disabled-rule acceptance path.
+    let reward: Awaited<ReturnType<typeof awardPoints>> | undefined;
+    let newBadges: string[] = [];
+    if (existing.submittedBy) {
+      reward = await awardPoints(
+        existing.submittedBy,
+        "submission_approved",
+        id
+      );
+      // Community badges (issue #105). Re-evaluate the submitter's
+      // shelf so `first_submission` lands the moment their first
+      // approved piece is published. The evaluator is idempotent — a
+      // member with the badge already keeps it without a duplicate row.
+      const awarded = await evaluateBadges(existing.submittedBy);
+      newBadges = awarded.map((b) => b.badgeId);
+    }
+    return HttpResponse.json({
+      ok: true,
+      article: updated,
+      reward: reward && reward.points > 0 ? reward : undefined,
+      newBadges,
+    });
+  }),
+
+  http.post("/api/cms/submissions/:id/reject", async ({ request, params }) => {
+    const denied = guardRole(request, "publish");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    const existing = await db.articles.get(id);
+    if (!existing) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (existing.kind !== "submission") {
+      return HttpResponse.json(
+        { error: "Article is not a reader submission" },
+        { status: 400 }
+      );
+    }
+    await db.articles.update(id, { status: "rejected" });
+    const updated = await db.articles.get(id);
+    return HttpResponse.json({ ok: true, article: updated });
+  }),
+];
+
 export const handlers = [
   ...migratedStoriesHandlers,
+  ...migratedSubmissionHandlers,
 
   http.get("/api/cms/articles", async () => {
     await promoteDueScheduled();
@@ -823,153 +979,6 @@ export const handlers = [
       memberId?: string;
     };
     return handleRedemption(body);
-  }),
-
-  // Public reader-submission endpoint (issue #91). Auth-gated by
-  // requiring a memberId on the body — UI is also gated, this mirror
-  // is so the storage record never lands without attribution. The
-  // handler trusts the body's memberId because the public app's
-  // session is mocked client-side; no SSR auth to verify.
-  http.post("/api/readers/submissions", async ({ request }) => {
-    const body = (await request.json()) as {
-      bodyJson?: string;
-      coverFocalPoint?: { x: number; y: number };
-      coverUrl?: string;
-      memberId?: string;
-      title?: string;
-    };
-    if (!body.memberId) {
-      return HttpResponse.json({ error: "Sign in to submit" }, { status: 401 });
-    }
-    try {
-      const article = await createSubmission({
-        memberId: body.memberId,
-        draft: {
-          title: body.title ?? "",
-          bodyJson: body.bodyJson ?? "",
-          coverUrl: body.coverUrl,
-          coverFocalPoint: body.coverFocalPoint,
-        },
-      });
-      return HttpResponse.json(article, { status: 201 });
-    } catch (e) {
-      return HttpResponse.json(
-        { error: e instanceof Error ? e.message : "Submission failed" },
-        { status: 400 }
-      );
-    }
-  }),
-
-  // CMS submission approval queue (issue #102). Listing returns
-  // pending reader-contributed articles for the moderation desk;
-  // approve flips the row to published (status===published is the
-  // sentinel the public Readers listing already filters on), reject
-  // sets a 'rejected' status that stays out of the public listing
-  // too. Both mutations are role-guarded by the existing `publish`
-  // policy so only publishers + admins can act.
-  http.get("/api/cms/submissions", async () => {
-    const pending = await db.articles
-      .where("kind")
-      .equals("submission")
-      .filter((a) => a.status === "pending")
-      .toArray();
-    pending.sort((a, b) => b.date.localeCompare(a.date));
-    // Enrich with the submitter's display name so the list doesn't
-    // need a follow-up join.
-    const ids = [
-      ...new Set(
-        pending.map((a) => a.submittedBy).filter((id): id is string => !!id)
-      ),
-    ];
-    const members = ids.length
-      ? await db.members.where("id").anyOf(ids).toArray()
-      : [];
-    const memberById = new Map(members.map((m) => [m.id, m]));
-    return HttpResponse.json({
-      items: pending.map((a) => ({
-        id: a.id,
-        title: a.title,
-        slug: a.slug,
-        submittedAt: a.date,
-        submittedBy: a.submittedBy ?? null,
-        submitterName: a.submittedBy
-          ? (memberById.get(a.submittedBy)?.name ?? a.submittedBy)
-          : "Anonymous",
-        kind: a.kind,
-      })),
-      total: pending.length,
-    });
-  }),
-
-  http.post("/api/cms/submissions/:id/approve", async ({ request, params }) => {
-    const denied = guardRole(request, "publish");
-    if (denied) {
-      return denied;
-    }
-    const id = params.id as string;
-    const existing = await db.articles.get(id);
-    if (!existing) {
-      return HttpResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    if (existing.kind !== "submission") {
-      return HttpResponse.json(
-        { error: "Article is not a reader submission" },
-        { status: 400 }
-      );
-    }
-    await db.articles.update(id, {
-      status: "published",
-      publishedAt: new Date().toISOString(),
-    });
-    const updated = await db.articles.get(id);
-    // Community reward (issue #104). Awarding through the standard
-    // pipeline writes a behaviorLog + ledger entry and allocates the
-    // delta to the submitter's growth item. The `per-article` limit on
-    // `rr_submission_approved` ensures re-approval (e.g. unpublish →
-    // approve again) doesn't double-award. Disabled rules silently
-    // award zero, satisfying the disabled-rule acceptance path.
-    let reward: Awaited<ReturnType<typeof awardPoints>> | undefined;
-    let newBadges: string[] = [];
-    if (existing.submittedBy) {
-      reward = await awardPoints(
-        existing.submittedBy,
-        "submission_approved",
-        id
-      );
-      // Community badges (issue #105). Re-evaluate the submitter's
-      // shelf so `first_submission` lands the moment their first
-      // approved piece is published. The evaluator is idempotent — a
-      // member with the badge already keeps it without a duplicate row.
-      const awarded = await evaluateBadges(existing.submittedBy);
-      newBadges = awarded.map((b) => b.badgeId);
-    }
-    return HttpResponse.json({
-      ok: true,
-      article: updated,
-      reward: reward && reward.points > 0 ? reward : undefined,
-      newBadges,
-    });
-  }),
-
-  http.post("/api/cms/submissions/:id/reject", async ({ request, params }) => {
-    const denied = guardRole(request, "publish");
-    if (denied) {
-      return denied;
-    }
-    const id = params.id as string;
-    const existing = await db.articles.get(id);
-    if (!existing) {
-      return HttpResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    if (existing.kind !== "submission") {
-      return HttpResponse.json(
-        { error: "Article is not a reader submission" },
-        { status: 400 }
-      );
-    }
-    await db.articles.update(id, { status: "rejected" });
-    const updated = await db.articles.get(id);
-    return HttpResponse.json({ ok: true, article: updated });
   }),
 
   http.post("/api/events", async ({ request }) => {
