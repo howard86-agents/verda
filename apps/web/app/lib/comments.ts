@@ -60,3 +60,34 @@ export async function postComment(args: {
   await db.comments.put(comment);
   return comment;
 }
+
+/**
+ * List recent comments across every article, newest-first, for the
+ * CMS moderation surface (issue #101). Includes already-removed rows
+ * so moderators can see history; the public reader still hides them
+ * via `listComments`.
+ */
+export async function listAllRecentComments(limit = 50): Promise<Comment[]> {
+  const all = await db.comments.toArray();
+  return all
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit);
+}
+
+/**
+ * Soft-remove a comment (issue #101). Keeps the row so audit history
+ * stays intact and the public reader's filter on `removedAt` simply
+ * hides it. Returns the updated row, or `null` if the comment doesn't
+ * exist.
+ */
+export async function removeComment(id: string): Promise<Comment | null> {
+  const existing = await db.comments.get(id);
+  if (!existing) {
+    return null;
+  }
+  await db.comments.update(id, {
+    removedAt: new Date().toISOString(),
+  });
+  const updated = await db.comments.get(id);
+  return updated ?? null;
+}

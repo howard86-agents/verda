@@ -19,7 +19,8 @@ export type CmsAction =
   | "manage_rules"
   | "point_adjust"
   | "member_delete"
-  | "upload_media";
+  | "upload_media"
+  | "moderate_comments";
 
 const POLICY: Record<CmsAction, CmsRole[]> = {
   create_draft: ["editor", "publisher", "admin"],
@@ -31,6 +32,10 @@ const POLICY: Record<CmsAction, CmsRole[]> = {
   point_adjust: ["admin", "customer-service"],
   member_delete: ["admin"],
   upload_media: ["editor", "publisher", "admin"],
+  // Comment moderation (issue #101) — same role surface as editorial
+  // mutations (editor + publisher + admin) so the desk can clean up
+  // discussion without needing the elevated admin role.
+  moderate_comments: ["editor", "publisher", "admin"],
 };
 
 export function can(action: CmsAction, role: CmsRole): boolean {
