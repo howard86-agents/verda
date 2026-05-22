@@ -47,12 +47,14 @@ test("category filter narrows results", async ({ page }) => {
   // Click Nutrition category
   await page.getByRole("button", { name: "Nutrition" }).click();
 
-  // Wait for filtered results to load
-  await expect(page.getByText("02 entries")).toBeVisible({ timeout: 5000 });
+  // Wait for filtered results to load. After issue #96 seeded the
+  // section-fill stories, Nutrition holds four published pieces:
+  // s02, s06 (original) plus s09, s10 (added).
+  await expect(page.getByText("04 entries")).toBeVisible({ timeout: 5000 });
 
   // Should show only nutrition stories
   const articles = page.locator("article");
-  await expect(articles).toHaveCount(2);
+  await expect(articles).toHaveCount(4);
 });
 
 test("sort changes story order", async ({ page }) => {
