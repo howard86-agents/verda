@@ -15,6 +15,7 @@ import {
   mockRewardFor,
 } from "@/lib/redemption";
 import { allocateGrowthForMember, awardPoints, levelFor } from "@/lib/rewards";
+import { computeStreak, isMaintainingStreak } from "@/lib/streak";
 
 async function handleRedemption(body: {
   growthItemId?: number;
@@ -153,7 +154,49 @@ async function handleCheckIn(memberId: string) {
     await allocateGrowthForMember(memberId, pts);
   }
 
-  return HttpResponse.json({ ok: true, points: pts, balance: newBalance });
+  // Streak bonus (issue #92) — fires from day 2 onwards. The
+  // `streak_bonus` reward rule's per-day limit makes this idempotent if
+  // multiple read_completes land in the same day too.
+  const streakResult = await applyStreakBonus(memberId);
+
+  return HttpResponse.json({
+    ok: true,
+    points: pts + streakResult.points,
+    balance: streakResult.balance > 0 ? streakResult.balance : newBalance,
+    streak: streakResult.streak,
+    streakPoints: streakResult.points,
+  });
+}
+
+/**
+ * Apply the consecutive-day streak bonus (issue #92). Reads the
+ * member's behavior log fresh — the calling check-in / read-complete
+ * handler has already appended its own entry — so the streak count
+ * includes today. The actual award goes through the standard reward
+ * pipeline (`awardPoints("streak_bonus")`) so it inherits the per-day
+ * guard, the configured points, and the growth allocation.
+ */
+async function applyStreakBonus(memberId: string): Promise<{
+  balance: number;
+  points: number;
+  streak: number;
+}> {
+  const allLogs = await db.behaviorLogs
+    .where("memberId")
+    .equals(memberId)
+    .toArray();
+  const streak = computeStreak(allLogs);
+  if (!isMaintainingStreak(streak)) {
+    const ledger = await db.pointLedger
+      .where("memberId")
+      .equals(memberId)
+      .toArray();
+    const balance =
+      ledger.length > 0 ? Math.max(...ledger.map((e) => e.balanceAfter)) : 0;
+    return { points: 0, balance, streak };
+  }
+  const reward = await awardPoints(memberId, "streak_bonus");
+  return { points: reward.points, balance: reward.balance, streak };
 }
 
 function getRoleFromHeader(request: Request): CmsRole {
@@ -699,7 +742,16 @@ export const handlers = [
       }
 
       const reward = await awardPoints(memberId, "read_complete", articleId);
-      return HttpResponse.json({ ok: true, ...reward });
+      const streakResult = await applyStreakBonus(memberId);
+      return HttpResponse.json({
+        ok: true,
+        ...reward,
+        points: reward.points + streakResult.points,
+        balance:
+          streakResult.balance > 0 ? streakResult.balance : reward.balance,
+        streak: streakResult.streak,
+        streakPoints: streakResult.points,
+      });
     }
 
     if (action === "check_in") {
