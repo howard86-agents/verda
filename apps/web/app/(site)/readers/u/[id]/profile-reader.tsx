@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { BADGE_CATALOG } from "@verda/data";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CoverImage } from "@/_components/cover-image";
@@ -116,6 +117,11 @@ function ProfileBody({ profile }: { profile: PublicReaderProfile }) {
           </div>
         </section>
 
+        {/* Earned-badge shelf (issue #105). Renders only the badges
+            this member has earned — locked badges stay private to the
+            member's own Grow page. */}
+        <ProfileBadgeShelf badges={profile.badges} />
+
         {/* Submissions list */}
         <section className="mt-12 border-t border-t-ink pt-7">
           <div className="flex items-baseline justify-between border-line border-b pb-3">
@@ -184,4 +190,80 @@ function ProfileBody({ profile }: { profile: PublicReaderProfile }) {
       </div>
     </div>
   );
+}
+
+function ProfileBadgeShelf({
+  badges,
+}: {
+  badges: PublicReaderProfile["badges"];
+}) {
+  if (badges.length === 0) {
+    return null;
+  }
+  const byId = new Map(badges.map((b) => [b.badgeId, b]));
+  // Render in catalog display order so cards keep deterministic
+  // placement across visits, mirroring the Grow page shelf.
+  const cards = BADGE_CATALOG.filter((b) => byId.has(b.id));
+
+  return (
+    <section
+      aria-label="Earned badges"
+      className="mt-10 border-t border-t-ink pt-7"
+    >
+      <div className="flex items-baseline justify-between border-line border-b pb-3">
+        <div>
+          <div className="font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
+            Badges · 章
+          </div>
+          <div className="mt-1 font-display font-medium text-[24px] tracking-[-0.005em]">
+            {String(badges.length).padStart(2, "0")} earned
+          </div>
+        </div>
+      </div>
+      <ul className="mt-5 grid grid-cols-2 gap-3 max-[640px]:grid-cols-1">
+        {cards.map((b) => {
+          const earned = byId.get(b.id);
+          return (
+            <li
+              className="grid grid-cols-[44px_1fr] gap-3 border border-ink bg-paper p-4"
+              key={b.id}
+            >
+              <div
+                aria-hidden
+                className="flex h-11 w-11 items-center justify-center text-[22px]"
+              >
+                {b.icon}
+              </div>
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display font-medium text-[16px]">
+                    {b.name}
+                  </span>
+                  <span className="font-display text-[12px] text-muted italic">
+                    {b.jp}
+                  </span>
+                </div>
+                <p className="mt-1 font-display text-[13.5px] text-ink-soft leading-[1.4]">
+                  {b.description}
+                </p>
+                {earned && (
+                  <div className="mt-2 font-mono text-[9.5px] text-vermilion uppercase tracking-[0.18em]">
+                    Earned · {formatBadgeEarned(earned.earnedAt)}
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function formatBadgeEarned(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return "";
+  }
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }

@@ -84,3 +84,74 @@ test("the profile carries a 'Browse all' link back to the readers listing", asyn
   await page.getByRole("link", { name: BROWSE_ALL_RE }).click();
   await expect(page).toHaveURL(READERS_LISTING_URL_RE);
 });
+
+test("the profile renders the earned community-badge shelf (issue #105)", async ({
+  page,
+}) => {
+  await page.goto("/readers/u/m_5102");
+  await expect(
+    page.getByRole("heading", { name: HANA_HEADING_RE })
+  ).toBeVisible({ timeout: 15_000 });
+
+  // Hand-award the two community badges to the seeded member by
+  // posting a comment + approving a submission as the rest of the
+  // app would. This drives the same evaluateBadges path the runtime
+  // handlers do (#104 is sibling, so we can't rely on its rewards
+  // here, but the comment / approve paths still trigger badges on
+  // this branch).
+  await page.evaluate(async () => {
+    // Comment as Hana on s01 — fires the comment-post handler which
+    // calls evaluateBadges and awards `commenter`.
+    await fetch("/api/articles/s01/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        memberId: "m_5102",
+        memberName: "Hana Watanabe",
+        text: "Profile-shelf e2e marker comment.",
+      }),
+    });
+    // Create a pending submission for Hana, then approve it as admin
+    // — fires evaluateBadges and awards `first_submission`.
+    const created = await fetch("/api/readers/submissions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cms-role": "admin",
+      },
+      body: JSON.stringify({
+        memberId: "m_5102",
+        title: "Profile shelf e2e marker submission",
+        bodyJson: JSON.stringify({
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "marker body" }],
+            },
+          ],
+        }),
+      }),
+    });
+    if (created.ok) {
+      const article = (await created.json()) as { id: string };
+      await fetch(`/api/cms/submissions/${article.id}/approve`, {
+        method: "POST",
+        headers: { "x-cms-role": "admin" },
+      });
+    }
+  });
+
+  // Reload so the profile re-fetches with the freshly awarded badges.
+  await page.goto("/readers/u/m_5102");
+  await expect(
+    page.getByRole("heading", { name: HANA_HEADING_RE })
+  ).toBeVisible({ timeout: 15_000 });
+
+  const badgeShelf = page.getByLabel("Earned badges");
+  await expect(badgeShelf).toBeVisible();
+  await expect(badgeShelf.getByText("First submission")).toBeVisible();
+  await expect(badgeShelf.getByText("Commenter")).toBeVisible();
+  // Locked-badge copy must not surface on the public profile.
+  await expect(page.getByText("Locked")).toHaveCount(0);
+});
