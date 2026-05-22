@@ -27,15 +27,50 @@ export interface Article {
   publishedAt?: string;
   read: number;
   scheduledAt?: string;
+  /**
+   * Stable id of the editorial section this article belongs to (issue
+   * #87). Mirrors a row in the `sections` table; the older free-form
+   * `cat` is kept alongside for back-compat with the existing CMS
+   * filter/listing API while the content model migrates.
+   */
+  section?: string;
+  /** Optional multi-part series grouping (issue #87). */
+  series?: ArticleSeries;
   slug: string;
   /** Public URL for the original source. */
   sourceUrl?: string;
   /** Original source label (handle, publication, …). */
   src?: string;
   status?: string;
+  /**
+   * Optional id of the member who submitted this content (issue #87).
+   * Used for reader profiles (#103) and the community reward pipeline
+   * (#104) to attribute submissions/reposts/remixes to a real member.
+   */
+  submittedBy?: string;
   sum: string;
   tag: string;
   title: string;
+}
+
+/**
+ * A multi-part-story grouping reference stored on `Article.series`.
+ * `ordinal` is a 1-based part number used to render part indicators on
+ * the public reader and in story cards (issue #87).
+ */
+export interface ArticleSeries {
+  name: string;
+  ordinal: number;
+}
+
+/**
+ * The editorial section taxonomy (issue #87). Stored in its own table so
+ * the seeded set is queryable for section-browse pages (#98), search
+ * (#99), and related-content ranking (#100).
+ */
+export interface SectionRow {
+  id: string;
+  name: string;
 }
 
 export interface Member {
@@ -260,6 +295,7 @@ const db = new Dexie("verda") as Dexie & {
   articleVersions: EntityTable<ArticleVersion, "id">;
   auditLog: EntityTable<AuditLog, "id">;
   redemptions: EntityTable<Redemption, "id">;
+  sections: EntityTable<SectionRow, "id">;
   comments: EntityTable<Comment, "id">;
 };
 
@@ -324,12 +360,31 @@ db.version(4).stores({
   redemptions: "id, memberId, &growthItemId, createdAt",
 });
 
-// v5 — issue #89: flat live comments on articles.
+// v5 — issue #87: first-class content-model fields.
+// Adds:
+//   - a `sections` table for the canonical editorial section taxonomy
+//     (Mindful Living, Nutrition, Movement, Earth & Garden, Recipes),
+//     queryable for section-browse pages (#98), search (#99), and
+//     related-content ranking (#100);
+//   - a `section` index on `articles` so list/filter by section is cheap;
+//   - a `submittedBy` index on `articles` so reader profiles (#103) can
+//     pull a member's contributed items in one query.
+// `series` is stored as a nested object on the article row and isn't
+// indexed — series lookups are infrequent and best done by reading the
+// article first. Existing rows round-trip without modification: every
+// new field is optional.
+db.version(5).stores({
+  articles: "id, slug, kind, cat, tag, status, section, submittedBy",
+  sections: "id, name",
+});
+
+// v6 — issue #89: flat live comments on articles.
 // Adds the `comments` table indexed by article + creation time so the
 // public reader can fetch newest-first comments per article without a
 // full scan. Indexed on memberId too so the future moderation surface
-// (#101) can pull all comments by an author.
-db.version(5).stores({
+// (#101) can pull all comments by an author. Bumped to v6 in rebase
+// because #87 already claimed v5 with the section taxonomy.
+db.version(6).stores({
   comments: "id, articleId, memberId, createdAt",
 });
 

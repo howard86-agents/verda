@@ -295,11 +295,30 @@ export const handlers = [
     }
     const body = (await request.json()) as Record<string, unknown>;
     const id = `a_${Date.now().toString(36)}`;
+    const series = body.series as
+      | { name?: unknown; ordinal?: unknown }
+      | undefined;
     const article = {
       id,
       slug: (body.slug as string) || id,
       kind: (body.kind as string) || "brand",
       cat: (body.cat as string) || "",
+      section:
+        typeof body.section === "string" && body.section
+          ? (body.section as string)
+          : undefined,
+      series:
+        series &&
+        typeof series.name === "string" &&
+        series.name &&
+        typeof series.ordinal === "number" &&
+        series.ordinal > 0
+          ? { name: series.name, ordinal: series.ordinal }
+          : undefined,
+      submittedBy:
+        typeof body.submittedBy === "string" && body.submittedBy
+          ? (body.submittedBy as string)
+          : undefined,
       tag: (body.tag as string) || "",
       title: (body.title as string) || "Untitled",
       jp: (body.jp as string) || "",

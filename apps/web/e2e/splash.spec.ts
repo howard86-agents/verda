@@ -2,7 +2,13 @@ import { expect, test } from "@playwright/test";
 
 const SPLASH_LABEL = "Loading Verda";
 const WORDMARK_RE = /^VERDA\.?$/;
-const HERO_HEADING_RE = /Letters to a slower year/i;
+// Issue #88: the homepage hero now reads from the published store. The
+// first seeded brand story ("May 18") is the quiet-rituals piece, so we
+// anchor on that real title rather than the old hardcoded mockup. We
+// also assert the legacy "Letters to a slower year" copy is no longer
+// anywhere on the page.
+const HERO_HEADING_RE = /The quiet rituals that shape a slower morning/i;
+const LEGACY_HERO_RE = /Letters to a slower year/i;
 
 test("public route shows the branded splash before MSW + Dexie are ready", async ({
   page,
@@ -43,7 +49,8 @@ test("splash is replaced by the real UI once the providers are ready", async ({
   page,
 }) => {
   await page.goto("/");
-  // Eventually the home hero ("Letters to a slower year") renders.
+  // Eventually the home hero — sourced from the latest published article —
+  // renders.
   await expect(
     page.getByRole("heading", { name: HERO_HEADING_RE })
   ).toBeVisible({ timeout: 15_000 });
@@ -51,4 +58,6 @@ test("splash is replaced by the real UI once the providers are ready", async ({
   await expect(
     page.getByRole("status", { name: SPLASH_LABEL })
   ).not.toBeVisible();
+  // The legacy hardcoded mockup must not appear (issue #88).
+  await expect(page.getByText(LEGACY_HERO_RE)).toHaveCount(0);
 });
