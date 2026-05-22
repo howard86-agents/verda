@@ -7,6 +7,7 @@ import {
   type Social,
   STORIES,
 } from "@verda/data";
+import { COMMUNITY_REWARD_RULES } from "./community-rewards";
 import {
   type Article,
   db,
@@ -238,6 +239,12 @@ export async function seedIfEmpty() {
       enabled: true,
       limitType: "per-day",
     },
+    // Community rules (issue #104). Posting a comment, adding a
+    // reaction, and having a submission approved each award nutrients
+    // through the same `awardPoints` pipeline as the brand actions
+    // above. See `community-rewards.ts` for the action / id contract
+    // shared between seed, CMS labels, handlers, and tests.
+    ...COMMUNITY_REWARD_RULES,
   ]);
 
   await db.categories.bulkPut(

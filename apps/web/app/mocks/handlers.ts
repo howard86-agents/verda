@@ -869,7 +869,25 @@ export const handlers = [
       publishedAt: new Date().toISOString(),
     });
     const updated = await db.articles.get(id);
-    return HttpResponse.json({ ok: true, article: updated });
+    // Community reward (issue #104). Awarding through the standard
+    // pipeline writes a behaviorLog + ledger entry and allocates the
+    // delta to the submitter's growth item. The `per-article` limit on
+    // `rr_submission_approved` ensures re-approval (e.g. unpublish →
+    // approve again) doesn't double-award. Disabled rules silently
+    // award zero, satisfying the disabled-rule acceptance path.
+    let reward: Awaited<ReturnType<typeof awardPoints>> | undefined;
+    if (existing.submittedBy) {
+      reward = await awardPoints(
+        existing.submittedBy,
+        "submission_approved",
+        id
+      );
+    }
+    return HttpResponse.json({
+      ok: true,
+      article: updated,
+      reward: reward && reward.points > 0 ? reward : undefined,
+    });
   }),
 
   http.post("/api/cms/submissions/:id/reject", async ({ request, params }) => {
@@ -978,7 +996,20 @@ export const handlers = [
         memberName: body.memberName ?? "",
         text: body.text,
       });
-      return HttpResponse.json(comment, { status: 201 });
+      // Community reward (issue #104). Awards run after the comment
+      // is persisted so a failed insert can't leak nutrients. The
+      // `per-article` limit on `rr_comment_post` rewards the first
+      // comment a member leaves on an article and ignores subsequent
+      // ones; disabled rules silently award zero.
+      const reward = await awardPoints(
+        body.memberId,
+        "comment_post",
+        articleId
+      );
+      return HttpResponse.json(
+        { ...comment, reward: reward.points > 0 ? reward : undefined },
+        { status: 201 }
+      );
     }
   ),
 
@@ -1027,7 +1058,20 @@ export const handlers = [
         memberId: body.memberId,
         kind: body.kind,
       });
-      return HttpResponse.json(result);
+      // Community reward (issue #104). Award only when the toggle
+      // *added* a reaction (`active === true`); removing a reaction
+      // never earns a reward and the `per-article` limit on
+      // `rr_reaction_react` makes sure the first reaction a member
+      // leaves on an article rewards once regardless of which kind
+      // they pick later. Disabled rules silently award zero.
+      let reward: Awaited<ReturnType<typeof awardPoints>> | undefined;
+      if (result.active) {
+        reward = await awardPoints(body.memberId, "reaction_react", articleId);
+      }
+      return HttpResponse.json({
+        ...result,
+        reward: reward && reward.points > 0 ? reward : undefined,
+      });
     }
   ),
 
