@@ -356,6 +356,43 @@ export const migratedStoriesHandlers = [
   }),
 ];
 
+// The Dexie-backed handler for `/api/search` is factored out so
+// `mocks/browser.ts` can opt it out when `NEXT_PUBLIC_API_MODE=real`
+// (issue #128). With the migrated handler dropped, MSW falls through
+// and the real Postgres-backed Route Handler serves the request.
+export const migratedSearchHandlers = [
+  http.get("/api/search", async ({ request }) => {
+    const url = new URL(request.url);
+    const q = url.searchParams.get("q") ?? "";
+    const limit = Math.max(
+      1,
+      Math.min(20, Number(url.searchParams.get("limit") ?? "8"))
+    );
+    if (!q.trim()) {
+      return HttpResponse.json({ items: [], total: 0 });
+    }
+    const articles = await db.articles.toArray();
+    const published = articles.filter((a) => a.status === "published");
+    const hits = searchArticles(q, published, limit);
+    return HttpResponse.json({
+      items: hits.map((h) => ({
+        id: h.article.id,
+        slug: h.article.slug,
+        title: h.article.title,
+        sum: h.article.sum,
+        tag: h.article.tag,
+        kind: h.article.kind,
+        cat: h.article.cat,
+        section: h.article.section,
+        date: h.article.date,
+        score: h.score,
+        matchedFields: h.matchedFields,
+      })),
+      total: hits.length,
+    });
+  }),
+];
+
 export const handlers = [
   ...migratedStoriesHandlers,
 
@@ -708,40 +745,7 @@ export const handlers = [
     return HttpResponse.json(profile);
   }),
 
-  // Full-text command-palette search (issue #99). Scans every
-  // published article (including reader-contributed kinds) across
-  // title, summary, tags, section, and the flattened bodyJson, and
-  // returns ranked hits — see lib/search.ts for the weights.
-  http.get("/api/search", async ({ request }) => {
-    const url = new URL(request.url);
-    const q = url.searchParams.get("q") ?? "";
-    const limit = Math.max(
-      1,
-      Math.min(20, Number(url.searchParams.get("limit") ?? "8"))
-    );
-    if (!q.trim()) {
-      return HttpResponse.json({ items: [], total: 0 });
-    }
-    const articles = await db.articles.toArray();
-    const published = articles.filter((a) => a.status === "published");
-    const hits = searchArticles(q, published, limit);
-    return HttpResponse.json({
-      items: hits.map((h) => ({
-        id: h.article.id,
-        slug: h.article.slug,
-        title: h.article.title,
-        sum: h.article.sum,
-        tag: h.article.tag,
-        kind: h.article.kind,
-        cat: h.article.cat,
-        section: h.article.section,
-        date: h.article.date,
-        score: h.score,
-        matchedFields: h.matchedFields,
-      })),
-      total: hits.length,
-    });
-  }),
+  ...migratedSearchHandlers,
 
   http.get("/api/collections", async ({ request }) => {
     const url = new URL(request.url);
