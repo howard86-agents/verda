@@ -38,9 +38,27 @@ async function resolveRole(request: Request): Promise<CmsRole | null> {
     const sessionRole = session?.user?.role;
     return mapSessionRole(sessionRole);
   }
-  // Mock mode: trust the header for local dev impersonation
-  const header = request.headers.get("x-cms-role") as CmsRole | null;
-  return header || "editor";
+  // Mock mode: trust valid CMS role headers for local dev impersonation.
+  // An unset header defaults to `editor` so existing CMS UI calls keep
+  // working; an unknown role (e.g. `reader`) is rejected so the route
+  // returns 401 instead of falling through to the role-policy 403.
+  const header = request.headers.get("x-cms-role");
+  if (header == null) {
+    return "editor";
+  }
+  return mapHeaderRole(header);
+}
+
+function mapHeaderRole(role: string): CmsRole | null {
+  switch (role) {
+    case "editor":
+    case "publisher":
+    case "admin":
+    case "customer-service":
+      return role;
+    default:
+      return null;
+  }
 }
 
 function mapSessionRole(role: string | undefined): CmsRole | null {
