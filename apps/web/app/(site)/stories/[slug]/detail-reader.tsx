@@ -5,12 +5,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ArticleBody } from "@/_components/article-body";
+import { ArticleComments } from "@/_components/article-comments";
 import { CoverImage } from "@/_components/cover-image";
 import { IconBookmark, IconShare } from "@/_components/glyphs";
 import { useRewardToast } from "@/_components/reward-toast";
 import { StoryReactions } from "@/_components/story-reactions";
 import { useAuth } from "@/lib/auth";
 import type { Article } from "@/lib/db";
+import { sectionLabel, seriesPartLabel } from "@/lib/section";
 import { track } from "@/lib/track";
 import { useToggleSave } from "@/lib/use-collection";
 import { useReadComplete } from "@/lib/use-read-complete";
@@ -171,6 +173,8 @@ function DetailReaderBody({ article }: { article: Article }) {
 
   const initial = (article.author || "?").trim().charAt(0).toUpperCase() || "?";
   const tags = article.tag ? [article.tag] : [];
+  const sectionName = sectionLabel(article);
+  const seriesPart = seriesPartLabel(article.series);
 
   return (
     <div className="bg-paper text-ink">
@@ -187,7 +191,7 @@ function DetailReaderBody({ article }: { article: Article }) {
         <div className="shell flex items-center justify-between py-3 font-mono text-[10.5px] text-ink uppercase tracking-[0.22em]">
           <span>Vol.14 — №&nbsp;01</span>
           <span className="text-vermilion max-[640px]:hidden">
-            {(article.cat || "Story").toUpperCase()}
+            {(sectionName || "Story").toUpperCase()}
           </span>
           <span>{article.read || 0} MIN READ</span>
         </div>
@@ -208,7 +212,7 @@ function DetailReaderBody({ article }: { article: Article }) {
             />
             <div className="absolute top-0 left-0 z-10 h-[120px] w-[6px] bg-vermilion" />
             <div className="absolute bottom-[18px] left-[22px] z-10 font-mono text-[10px] text-white/80 uppercase tracking-[0.22em]">
-              cover · {article.cat || "story"}
+              cover · {sectionName || "story"}
             </div>
           </div>
         </section>
@@ -217,6 +221,11 @@ function DetailReaderBody({ article }: { article: Article }) {
         <section className="grid grid-cols-[1fr_720px_1fr] gap-10 pt-11 max-[1100px]:grid-cols-1">
           <div className="max-[1100px]:hidden" />
           <div className="mx-auto w-full max-w-[720px]">
+            {seriesPart && (
+              <div className="mb-3 text-center font-mono text-[10.5px] text-vermilion uppercase tracking-[0.22em]">
+                {seriesPart}
+              </div>
+            )}
             <h1 className="text-center font-display font-medium text-[64px] leading-[1.02] tracking-[-0.02em] max-[640px]:text-[44px]">
               {article.title}
               <span className="text-vermilion">.</span>
@@ -315,6 +324,14 @@ function DetailReaderBody({ article }: { article: Article }) {
           <DetailSidebar article={article} initial={initial} />
         </section>
 
+        <section className="grid grid-cols-[1fr_720px_1fr] items-start gap-10 max-[1100px]:grid-cols-1">
+          <div className="max-[1100px]:hidden" />
+          <div className="mx-auto w-full max-w-[720px]">
+            <ArticleComments articleId={article.id} />
+          </div>
+          <div className="max-[1100px]:hidden" />
+        </section>
+
         <div className="h-20" />
       </div>
     </div>
@@ -328,6 +345,7 @@ function DetailSidebar({
   article: Article;
   initial: string;
 }) {
+  const sectionName = sectionLabel(article);
   const readNextQuery = useQuery<ReadNextResponse>({
     queryKey: ["story-read-next", article.kind, article.id],
     queryFn: async () => {
@@ -372,9 +390,9 @@ function DetailSidebar({
               <span className="text-muted italic">No author</span>
             )}
           </div>
-          {article.cat && (
+          {sectionName && (
             <p className="mt-1 font-display text-[13px] text-muted italic leading-[1.5]">
-              {article.cat}
+              {sectionName}
             </p>
           )}
         </div>
@@ -400,7 +418,7 @@ function DetailSidebar({
               />
               <div>
                 <div className="font-mono text-[9px] text-muted uppercase tracking-[0.14em]">
-                  {s.cat} · {s.read} min
+                  {sectionLabel(s)} · {s.read} min
                 </div>
                 <div className="mt-[3px] line-clamp-2 font-display text-[13px] leading-[1.2]">
                   {s.title}
