@@ -254,6 +254,32 @@ export interface ArticleVersion {
 }
 
 /**
+ * The themed reaction types a member can leave on an article (issue #90).
+ *
+ * - `grew`    — 🌱 *grew me*
+ * - `learned` — 💡 *learned*
+ * - `loved`   — 🤍 *loved*
+ *
+ * Each member can hold at most one reaction of each kind per article;
+ * toggling the same kind twice removes the row.
+ */
+export type ReactionKind = "grew" | "learned" | "loved";
+
+/**
+ * A single member's reaction of a given kind on an article (issue #90).
+ * The `[memberId+articleId+kind]` compound index keeps lookup +
+ * uniqueness checks O(1). One reaction-of-each-kind per member per
+ * article is the model: toggling the same kind twice deletes the row.
+ */
+export interface Reaction {
+  articleId: string;
+  createdAt: string;
+  id?: number;
+  kind: ReactionKind;
+  memberId: string;
+}
+
+/**
  * A flat, live, public comment posted by a signed-in member on an
  * article (issue #89). Comments are listed newest-first and post live
  * (no pre-moderation, per the agreed trust model). Removal happens later
@@ -297,6 +323,7 @@ const db = new Dexie("verda") as Dexie & {
   redemptions: EntityTable<Redemption, "id">;
   sections: EntityTable<SectionRow, "id">;
   comments: EntityTable<Comment, "id">;
+  reactions: EntityTable<Reaction, "id">;
 };
 
 db.version(1).stores({
@@ -386,6 +413,16 @@ db.version(5).stores({
 // because #87 already claimed v5 with the section taxonomy.
 db.version(6).stores({
   comments: "id, articleId, memberId, createdAt",
+});
+
+// v7 — issue #90: themed reactions on articles.
+// Adds the `reactions` table with a unique compound `[memberId+articleId+kind]`
+// index so toggling the same kind twice is a no-op insert and per-member
+// uniqueness is enforced at the storage layer. Indexed on articleId so
+// the reader can roll up counts per kind in one scan. Bumped to v7 in
+// rebase because #87 took v5 (sections) and #89 took v6 (comments).
+db.version(7).stores({
+  reactions: "++id, articleId, memberId, &[memberId+articleId+kind]",
 });
 
 export { db };

@@ -375,6 +375,45 @@ export async function seedIfEmpty() {
     },
   ]);
 
+  // Seed a handful of reactions across two stories so the buttons show
+  // live counts on first boot (issue #90). Different kinds across the
+  // members exercise the per-kind rollup; the rest of the library
+  // exercises the zero-count empty state.
+  const reactionStamp = (offsetMinutes: number): string =>
+    new Date(Date.now() - offsetMinutes * 60 * 1000).toISOString();
+  await db.reactions.bulkAdd([
+    {
+      memberId: "m_5102",
+      articleId: "s01",
+      kind: "grew",
+      createdAt: reactionStamp(120),
+    },
+    {
+      memberId: "m_6033",
+      articleId: "s01",
+      kind: "loved",
+      createdAt: reactionStamp(60),
+    },
+    {
+      memberId: "m_7188",
+      articleId: "s01",
+      kind: "learned",
+      createdAt: reactionStamp(30),
+    },
+    {
+      memberId: "m_5102",
+      articleId: "s04",
+      kind: "loved",
+      createdAt: reactionStamp(20),
+    },
+    {
+      memberId: "m_6033",
+      articleId: "s04",
+      kind: "grew",
+      createdAt: reactionStamp(10),
+    },
+  ]);
+
   localStorage.setItem(SEED_KEY, "1");
 }
 

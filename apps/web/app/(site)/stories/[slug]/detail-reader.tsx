@@ -9,6 +9,7 @@ import { ArticleComments } from "@/_components/article-comments";
 import { CoverImage } from "@/_components/cover-image";
 import { IconBookmark, IconShare } from "@/_components/glyphs";
 import { useRewardToast } from "@/_components/reward-toast";
+import { StoryReactions } from "@/_components/story-reactions";
 import { useAuth } from "@/lib/auth";
 import type { Article } from "@/lib/db";
 import { sectionLabel, seriesPartLabel } from "@/lib/section";
@@ -315,6 +316,7 @@ function DetailReaderBody({ article }: { article: Article }) {
                 ))}
               </div>
             )}
+            <StoryReactions articleId={article.id} />
             <div ref={bottomRef} />
           </div>
 
