@@ -533,7 +533,13 @@ export const MEMBER = {
  * `apps/web/app/lib/badges.ts` so the catalog stays free of Dexie
  * imports and can be exported from this data package.
  */
-export type BadgeId = "first_read" | "reader_10" | "reader_25" | "first_bloom";
+export type BadgeId =
+  | "first_read"
+  | "reader_10"
+  | "reader_25"
+  | "first_bloom"
+  | "first_submission"
+  | "commenter";
 
 export interface Badge {
   /** Short marketing-style criteria copy for the locked card. */
@@ -579,5 +585,27 @@ export const BADGE_CATALOG: Badge[] = [
     icon: "🌸",
     description: "A seedling reached the Bloom level for the first time.",
     criteria: "Reach Bloom (Lv 03) on any plant",
+  },
+  // Community badges (issue #105). Awarded automatically when the
+  // member's first approved submission is published or their first
+  // comment is posted; the runtime predicate lives in
+  // `apps/web/app/lib/badges.ts`. The catalog stays free of Dexie
+  // imports so it can ship from the data package.
+  {
+    id: "first_submission",
+    name: "First submission",
+    jp: "初投稿",
+    icon: "✍️",
+    description:
+      "A reader submission was approved and published — your voice on the page.",
+    criteria: "Have one submission approved",
+  },
+  {
+    id: "commenter",
+    name: "Commenter",
+    jp: "コメンター",
+    icon: "💬",
+    description: "Posted a comment on a story — joined the conversation.",
+    criteria: "Post one comment",
   },
 ];

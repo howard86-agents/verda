@@ -1,5 +1,6 @@
 import "./test-setup";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { BADGE_CATALOG } from "@verda/data";
 import { evaluateBadges, readBadgeShelf } from "./badges";
 import { db } from "./db";
 
@@ -28,7 +29,10 @@ describe("evaluateBadges() — issue #93", () => {
     expect(awarded).toHaveLength(0);
     const shelf = await readBadgeShelf(MEMBER_ID);
     expect(shelf.earned).toHaveLength(0);
-    expect(shelf.locked).toHaveLength(4);
+    // Catalog grew with the community badges in issue #105; assert
+    // against `BADGE_CATALOG.length` so future additions don't force
+    // another test rewrite.
+    expect(shelf.locked).toHaveLength(BADGE_CATALOG.length);
   });
 
   test("awards first_read after one read_complete", async () => {
@@ -89,7 +93,11 @@ describe("evaluateBadges() — issue #93", () => {
     await evaluateBadges(MEMBER_ID);
     const shelf = await readBadgeShelf(MEMBER_ID);
     expect(shelf.earned.map((b) => b.badgeId)).toEqual(["first_read"]);
-    expect(shelf.locked).toEqual(["reader_10", "reader_25", "first_bloom"]);
+    // The locked list is the rest of `BADGE_CATALOG` in display order,
+    // which now includes the community badges added in issue #105.
+    expect(shelf.locked).toEqual(
+      BADGE_CATALOG.filter((b) => b.id !== "first_read").map((b) => b.id)
+    );
   });
 
   test("storage layer rejects duplicate awards directly", async () => {
@@ -116,6 +124,6 @@ describe("evaluateBadges() — issue #93", () => {
     await evaluateBadges(MEMBER_ID);
     const otherShelf = await readBadgeShelf("m_other");
     expect(otherShelf.earned).toHaveLength(0);
-    expect(otherShelf.locked).toHaveLength(4);
+    expect(otherShelf.locked).toHaveLength(BADGE_CATALOG.length);
   });
 });

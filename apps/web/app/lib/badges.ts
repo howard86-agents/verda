@@ -11,11 +11,22 @@ import { db, type MemberBadge } from "./db";
  */
 
 interface MemberSnapshot {
+  /** Number of approved (published) submissions/reposts/remixes
+   *  authored by this member (issue #105). */
+  approvedSubmissions: number;
+  /** Number of comments this member has posted (issue #105). */
+  commentsPosted: number;
   /** Highest level reached on any growth item. */
   highestLevel: number;
   /** Number of distinct articles the member has read to completion. */
   reads: number;
 }
+
+const READER_KIND_SET: ReadonlySet<string> = new Set([
+  "submission",
+  "repost",
+  "remix",
+]);
 
 async function snapshotMember(memberId: string): Promise<MemberSnapshot> {
   const reads = await db.behaviorLogs
@@ -33,7 +44,29 @@ async function snapshotMember(memberId: string): Promise<MemberSnapshot> {
     (max, it) => (it.level > max ? it.level : max),
     0
   );
-  return { reads, highestLevel };
+  // Approved submissions: reader-kind articles authored by this
+  // member that are currently published. Used by the community
+  // `first_submission` badge (issue #105).
+  const submittedArticles = await db.articles
+    .where("submittedBy")
+    .equals(memberId)
+    .toArray();
+  const approvedSubmissions = submittedArticles.filter(
+    (a) => READER_KIND_SET.has(a.kind) && a.status === "published"
+  ).length;
+  // Comments authored by this member, excluding soft-removed rows so
+  // a moderator deletion (issue #101) can't silently revoke the badge.
+  const allComments = await db.comments
+    .where("memberId")
+    .equals(memberId)
+    .toArray();
+  const commentsPosted = allComments.filter((c) => !c.removedAt).length;
+  return {
+    reads,
+    highestLevel,
+    approvedSubmissions,
+    commentsPosted,
+  };
 }
 
 /**
@@ -56,6 +89,14 @@ function earnedSet(snapshot: MemberSnapshot): Set<BadgeId> {
   // level.
   if (snapshot.highestLevel >= 3) {
     out.add("first_bloom");
+  }
+  // Community badges (issue #105). One approved submission and one
+  // posted comment respectively.
+  if (snapshot.approvedSubmissions >= 1) {
+    out.add("first_submission");
+  }
+  if (snapshot.commentsPosted >= 1) {
+    out.add("commenter");
   }
   return out;
 }
