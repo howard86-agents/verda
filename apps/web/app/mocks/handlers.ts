@@ -669,7 +669,8 @@ export const handlers = [
   // active growth item summary, and their approved submissions into a
   // narrow, privacy-filtered payload. Returns 404 for unknown or
   // soft-deleted members. Email and the private nutrient ledger are
-  // never part of this payload.
+  // never part of this payload. Issue #105 adds the earned-badge
+  // shelf alongside.
   http.get("/api/readers/u/:id", async ({ params }) => {
     const id = params.id as string;
     const member = await db.members.get(id);
@@ -682,12 +683,14 @@ export const handlers = [
       .equals(id)
       .toArray();
     const growthRules = await db.growthRules.toArray();
+    const badges = await db.memberBadges.where("memberId").equals(id).toArray();
 
     const profile = composePublicReaderProfile({
       member,
       articles,
       growthItems,
       growthRules,
+      badges,
     });
     if (!profile) {
       return HttpResponse.json({ error: "Not found" }, { status: 404 });
@@ -900,7 +903,16 @@ export const handlers = [
       publishedAt: new Date().toISOString(),
     });
     const updated = await db.articles.get(id);
-    return HttpResponse.json({ ok: true, article: updated });
+    // Community badges (issue #105). Re-evaluate the submitter's
+    // shelf so `first_submission` lands the moment their first
+    // approved piece is published. The evaluator is idempotent — a
+    // member with the badge already keeps it without a duplicate row.
+    let newBadges: string[] = [];
+    if (existing.submittedBy) {
+      const awarded = await evaluateBadges(existing.submittedBy);
+      newBadges = awarded.map((b) => b.badgeId);
+    }
+    return HttpResponse.json({ ok: true, article: updated, newBadges });
   }),
 
   http.post("/api/cms/submissions/:id/reject", async ({ request, params }) => {
@@ -1009,7 +1021,12 @@ export const handlers = [
         memberName: body.memberName ?? "",
         text: body.text,
       });
-      return HttpResponse.json(comment, { status: 201 });
+      // Community badges (issue #105). Re-evaluate the commenter's
+      // shelf so `commenter` lands on their first comment. The
+      // evaluator is idempotent — repeats keep the existing row.
+      const awarded = await evaluateBadges(body.memberId);
+      const newBadges = awarded.map((b) => b.badgeId);
+      return HttpResponse.json({ ...comment, newBadges }, { status: 201 });
     }
   ),
 
