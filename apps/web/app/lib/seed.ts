@@ -2,6 +2,7 @@ import {
   CATEGORIES,
   GROWTH_LEVELS,
   MEMBER,
+  SECTIONS,
   SOCIAL,
   type Social,
   STORIES,
@@ -93,6 +94,7 @@ function readerSeedFor(s: Social): Article {
     date: s.date,
     author: "",
     src: s.src,
+    submittedBy: s.submittedBy,
     sourceUrl: attr?.sourceUrl,
     license: attr?.license,
     contributors: attr?.contributors,
@@ -157,6 +159,8 @@ export async function seedIfEmpty() {
       slug: s.slug,
       kind: s.kind,
       cat: s.cat,
+      section: s.section,
+      series: s.series,
       tag: s.tag,
       title: s.title,
       jp: s.jp,
@@ -167,6 +171,7 @@ export async function seedIfEmpty() {
       read: s.read,
       date: s.date,
       author: s.author,
+      submittedBy: s.submittedBy,
       status: "published",
       bodyJson: JSON.stringify({
         type: "doc",
@@ -181,6 +186,11 @@ export async function seedIfEmpty() {
   );
 
   await db.articles.bulkPut(SOCIAL.map((s) => readerSeedFor(s)));
+
+  // Seed the canonical editorial sections (issue #87) so section-aware
+  // surfaces — listing filter, browse pages (#98), search (#99) — can
+  // query the taxonomy directly rather than re-deriving it from articles.
+  await db.sections.bulkPut(SECTIONS);
 
   await db.growthRules.bulkPut(
     GROWTH_LEVELS.map((g) => ({

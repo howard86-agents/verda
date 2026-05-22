@@ -8,6 +8,7 @@ import { IconDrop } from "@/_components/glyphs";
 import { Plant } from "@/_components/plant";
 import type { Article } from "@/lib/db";
 import { type HomeFeed, pickHomeFeed } from "@/lib/home";
+import { sectionLabel, seriesPartLabel } from "@/lib/section";
 
 interface ListingResponse {
   items: Article[];
@@ -134,12 +135,13 @@ function HomeContent({
   readers: Article[];
 }) {
   const featuredMetaParts = [
-    featured.cat || "Story",
+    sectionLabel(featured) || "Story",
     `${featured.read || 0} min`,
     featured.author ? `By ${featured.author}` : null,
   ].filter(Boolean) as string[];
   const firstLatest = latest.slice(0, 3);
   const secondLatest = latest.slice(3, 6);
+  const featuredSection = sectionLabel(featured);
 
   return (
     <div className="bg-cream text-ink">
@@ -163,7 +165,7 @@ function HomeContent({
               />
               <div className="absolute top-0 left-0 z-10 h-24 w-[6px] bg-vermilion" />
               <div className="absolute bottom-4 left-[18px] z-10 font-mono text-[10px] text-white/80 uppercase tracking-[0.18em]">
-                cover · {featured.cat || "story"}
+                cover · {featuredSection || "story"}
               </div>
             </Link>
             {/* Headline column */}
@@ -234,43 +236,51 @@ function HomeContent({
               </p>
             ) : (
               <div className="mt-7 grid grid-cols-3 gap-7 max-[640px]:grid-cols-1">
-                {firstLatest.map((s, i) => (
-                  <article key={s.id}>
-                    <Link href={`/stories/${s.slug}`}>
-                      <CoverImage
-                        alt={s.title}
-                        className="aspect-[4/5]"
-                        gradient={s.img}
-                        id={s.id}
-                        kind="stories"
-                        sizes="(max-width: 640px) 100vw, 30vw"
-                      />
-                      <div className="mt-[14px] grid grid-cols-[38px_1fr] gap-[10px]">
-                        <div className="font-display font-medium text-[22px] text-vermilion leading-none">
-                          {String(i + 1).padStart(2, "0")}
-                        </div>
-                        <div>
-                          <div className="font-mono text-[9.5px] text-muted uppercase tracking-[0.18em]">
-                            {s.cat} · {s.read} min · {s.date}
+                {firstLatest.map((s, i) => {
+                  const seriesPart = seriesPartLabel(s.series);
+                  return (
+                    <article key={s.id}>
+                      <Link href={`/stories/${s.slug}`}>
+                        <CoverImage
+                          alt={s.title}
+                          className="aspect-[4/5]"
+                          gradient={s.img}
+                          id={s.id}
+                          kind="stories"
+                          sizes="(max-width: 640px) 100vw, 30vw"
+                        />
+                        <div className="mt-[14px] grid grid-cols-[38px_1fr] gap-[10px]">
+                          <div className="font-display font-medium text-[22px] text-vermilion leading-none">
+                            {String(i + 1).padStart(2, "0")}
                           </div>
-                          <h3 className="mt-[6px] font-display font-medium text-[22px] leading-[1.15] tracking-[-0.005em]">
-                            {s.title}
-                          </h3>
-                          {s.jp && (
-                            <div className="mt-1 font-display text-[13px] text-muted italic">
-                              {s.jp}
+                          <div>
+                            <div className="font-mono text-[9.5px] text-muted uppercase tracking-[0.18em]">
+                              {sectionLabel(s)} · {s.read} min · {s.date}
                             </div>
-                          )}
-                          {s.sum && (
-                            <p className="mt-2 font-display text-[14px] text-ink-soft leading-[1.5]">
-                              {s.sum}
-                            </p>
-                          )}
+                            <h3 className="mt-[6px] font-display font-medium text-[22px] leading-[1.15] tracking-[-0.005em]">
+                              {s.title}
+                            </h3>
+                            {seriesPart && (
+                              <div className="mt-[3px] font-mono text-[9px] text-vermilion uppercase tracking-[0.16em]">
+                                {seriesPart}
+                              </div>
+                            )}
+                            {s.jp && (
+                              <div className="mt-1 font-display text-[13px] text-muted italic">
+                                {s.jp}
+                              </div>
+                            )}
+                            {s.sum && (
+                              <p className="mt-2 font-display text-[14px] text-ink-soft leading-[1.5]">
+                                {s.sum}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </Link>
-                  </article>
-                ))}
+                      </Link>
+                    </article>
+                  );
+                })}
               </div>
             )}
 
@@ -286,7 +296,7 @@ function HomeContent({
                     </div>
                     <div>
                       <div className="font-mono text-[9.5px] text-muted uppercase tracking-[0.18em]">
-                        {s.cat} · {s.read} min
+                        {sectionLabel(s)} · {s.read} min
                       </div>
                       <h3 className="mt-1 font-display font-medium text-[18px] leading-[1.18]">
                         <Link href={`/stories/${s.slug}`}>{s.title}</Link>
