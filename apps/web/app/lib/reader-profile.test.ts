@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import type { Article, GrowthItem, GrowthRule, Member } from "./db";
+import type {
+  Article,
+  GrowthItem,
+  GrowthRule,
+  Member,
+  MemberBadge,
+} from "./db";
 import {
   composePublicReaderProfile,
   pickActiveGrowthItem,
@@ -283,5 +289,72 @@ describe("composePublicReaderProfile() — composition", () => {
       articles: [articleFixture({ slug: "small-bento-long-train", id: "r04" })],
     });
     expect(profile?.submissions[0]?.slug).toBe("small-bento-long-train");
+  });
+});
+
+describe("composePublicReaderProfile() — badges (issue #105)", () => {
+  function badgeFixture(badgeId: string, earnedAt: string): MemberBadge {
+    return { memberId: "m_5102", badgeId, earnedAt };
+  }
+
+  test("returns an empty badges array when none are passed", () => {
+    const profile = composePublicReaderProfile({
+      member: memberFixture(),
+      growthItems: [],
+      growthRules: RULES,
+      articles: [],
+    });
+    expect(profile?.badges).toEqual([]);
+  });
+
+  test("surfaces only the catalog-stable id and earned-at timestamp", () => {
+    const profile = composePublicReaderProfile({
+      member: memberFixture(),
+      growthItems: [],
+      growthRules: RULES,
+      articles: [],
+      badges: [
+        badgeFixture("first_read", "2025-04-10T00:00:00.000Z"),
+        badgeFixture("commenter", "2025-05-01T00:00:00.000Z"),
+      ],
+    });
+    expect(profile?.badges).toEqual([
+      { badgeId: "first_read", earnedAt: "2025-04-10T00:00:00.000Z" },
+      { badgeId: "commenter", earnedAt: "2025-05-01T00:00:00.000Z" },
+    ]);
+  });
+
+  test("orders earned badges oldest-first by earnedAt", () => {
+    const profile = composePublicReaderProfile({
+      member: memberFixture(),
+      growthItems: [],
+      growthRules: RULES,
+      articles: [],
+      badges: [
+        badgeFixture("commenter", "2025-05-01T00:00:00.000Z"),
+        badgeFixture("first_read", "2025-04-10T00:00:00.000Z"),
+        badgeFixture("first_submission", "2025-04-25T00:00:00.000Z"),
+      ],
+    });
+    expect(profile?.badges.map((b) => b.badgeId)).toEqual([
+      "first_read",
+      "first_submission",
+      "commenter",
+    ]);
+  });
+
+  test("never includes locked badges in the public payload", () => {
+    const profile = composePublicReaderProfile({
+      member: memberFixture(),
+      growthItems: [],
+      growthRules: RULES,
+      articles: [],
+      badges: [badgeFixture("commenter", "2025-05-01T00:00:00.000Z")],
+    });
+    // Only the one earned badge surfaces; nothing about locked
+    // criteria leaks through (the public profile is "earned only").
+    expect(profile?.badges).toHaveLength(1);
+    expect(JSON.stringify(profile?.badges)).not.toContain("locked");
+    expect(JSON.stringify(profile?.badges)).not.toContain("criteria");
   });
 });

@@ -1,4 +1,10 @@
-import type { Article, GrowthItem, GrowthRule, Member } from "./db";
+import type {
+  Article,
+  GrowthItem,
+  GrowthRule,
+  Member,
+  MemberBadge,
+} from "./db";
 
 /**
  * Public reader-profile composer (issue #103).
@@ -40,8 +46,20 @@ export interface PublicReaderGrowth {
   name: string;
 }
 
+/** Earned-badge entry on a public profile (issue #105).
+ *
+ * Carries only the catalog-stable id and the earned-at ISO so the
+ * client can resolve the display label / icon via the shared
+ * `BADGE_CATALOG` and decide its own date formatting. */
+export interface PublicReaderBadge {
+  badgeId: string;
+  earnedAt: string;
+}
+
 /** Public-facing reader profile payload. */
 export interface PublicReaderProfile {
+  /** Earned community / reading badges, catalog-order (issue #105). */
+  badges: PublicReaderBadge[];
   /** Active growth item summary, or `null` if the member has none. */
   growth: PublicReaderGrowth | null;
   member: {
@@ -103,11 +121,12 @@ export function pickActiveGrowthItem(
  */
 export function composePublicReaderProfile(args: {
   articles: Article[];
+  badges?: MemberBadge[];
   growthItems: GrowthItem[];
   growthRules: GrowthRule[];
   member: Member | undefined;
 }): PublicReaderProfile | null {
-  const { articles, growthItems, growthRules, member } = args;
+  const { articles, badges, growthItems, growthRules, member } = args;
   if (!member || member.deletedAt) {
     return null;
   }
@@ -138,6 +157,16 @@ export function composePublicReaderProfile(args: {
     ? buildGrowthSummary(activeItem, growthRules)
     : null;
 
+  // Public badge shelf (issue #105). Earned-only — locked badges are
+  // a private concern (the member's own Grow page already shows them)
+  // and would advertise unmet criteria to anyone visiting the URL.
+  const earnedBadges = (badges ?? [])
+    .map<PublicReaderBadge>((b) => ({
+      badgeId: b.badgeId,
+      earnedAt: b.earnedAt,
+    }))
+    .sort((a, b) => a.earnedAt.localeCompare(b.earnedAt));
+
   return {
     member: {
       id: member.id,
@@ -146,6 +175,7 @@ export function composePublicReaderProfile(args: {
     },
     growth,
     submissions,
+    badges: earnedBadges,
   };
 }
 
