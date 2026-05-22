@@ -14,6 +14,7 @@ import {
   GROWTH_CONFIG_DEFAULT_ID,
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
 } from "./db";
+import { STORY_BODIES } from "./story-bodies";
 
 const SEED_KEY = "verda.seeded";
 
@@ -154,35 +155,47 @@ export async function seedIfEmpty() {
   }
 
   await db.articles.bulkPut(
-    STORIES.map((s) => ({
-      id: s.id,
-      slug: s.slug,
-      kind: s.kind,
-      cat: s.cat,
-      section: s.section,
-      series: s.series,
-      tag: s.tag,
-      title: s.title,
-      jp: s.jp,
-      sum: s.sum,
-      img: s.img,
-      imagePrompt: s.imagePrompt,
-      imageSeed: s.imageSeed,
-      read: s.read,
-      date: s.date,
-      author: s.author,
-      submittedBy: s.submittedBy,
-      status: "published",
-      bodyJson: JSON.stringify({
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [{ type: "text", text: s.sum }],
-          },
-        ],
-      }),
-    }))
+    STORIES.map((s) => {
+      // Section-fill stories (issue #96) ship multi-paragraph bodies via
+      // STORY_BODIES so the public reader has real ~400-700 word content
+      // to render. Stories without a custom body fall back to the
+      // single-paragraph behaviour used by s01–s06 (paragraph derived
+      // from `sum`). Both shapes are valid Tiptap docs the renderer
+      // already understands.
+      const customBody = STORY_BODIES[s.id];
+      const bodyJson = customBody
+        ? JSON.stringify(customBody)
+        : JSON.stringify({
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: s.sum }],
+              },
+            ],
+          });
+      return {
+        id: s.id,
+        slug: s.slug,
+        kind: s.kind,
+        cat: s.cat,
+        section: s.section,
+        series: s.series,
+        tag: s.tag,
+        title: s.title,
+        jp: s.jp,
+        sum: s.sum,
+        img: s.img,
+        imagePrompt: s.imagePrompt,
+        imageSeed: s.imageSeed,
+        read: s.read,
+        date: s.date,
+        author: s.author,
+        submittedBy: s.submittedBy,
+        status: "published",
+        bodyJson,
+      };
+    })
   );
 
   await db.articles.bulkPut(SOCIAL.map((s) => readerSeedFor(s)));
