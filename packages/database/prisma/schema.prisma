@@ -320,6 +320,26 @@ model Reaction {
   @@map("reactions")
 }
 
+/// CMS media asset metadata (issue #136). Binary payloads live in
+/// Supabase Storage in production, or a local filesystem adapter for
+/// docker-compose / offline development; this table stores only the
+/// renderable public URL plus the upload metadata. The unique
+/// `path` index doubles as the de-dup guard for re-records.
+model MediaAsset {
+  id        String   @id @default(cuid())
+  filename  String
+  mimeType  String
+  url       String
+  alt       String   @default("")
+  path      String   @unique
+  provider  String   @default("local")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([mimeType])
+  @@map("media_assets")
+}
+
 /// Achievement badges (issue #138). Unique on [userId, badgeId] so
 /// a badge is granted exactly once per user.
 model MemberBadge {

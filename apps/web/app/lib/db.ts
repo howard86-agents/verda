@@ -235,12 +235,15 @@ export const GROWTH_CONFIG_DEFAULT_MAX_ITEMS = 3;
 
 export interface MediaAsset {
   alt: string;
-  blob: Blob;
+  blob?: Blob;
   createdAt: string;
   filename: string;
   focalPoint?: { x: number; y: number };
   id: string;
   mimeType: string;
+  path?: string;
+  provider?: string;
+  url?: string;
 }
 
 export interface ArticleVersion {

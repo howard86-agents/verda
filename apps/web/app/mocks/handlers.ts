@@ -26,6 +26,17 @@ import { allocateGrowthForMember, awardPoints, levelFor } from "@/lib/rewards";
 import { searchArticles } from "@/lib/search";
 import { computeStreak, isMaintainingStreak } from "@/lib/streak";
 
+// In-memory pending media uploads for the mock signed-upload flow
+// (issue #136). The MSW handlers replicate the production sign →
+// upload → record dance: `/api/cms/media/sign` records the path
+// here, the browser PUTs to the mock upload URL which stashes the
+// Blob under that path, and a GET on the same URL serves the blob
+// back so previews work without a real Storage backend.
+const mockPendingMediaUploads = new Map<
+  string,
+  { blob?: Blob; filename: string; mimeType: string }
+>();
+
 async function handleRedemption(body: {
   growthItemId?: number;
   memberId?: string;
@@ -1290,7 +1301,13 @@ export const handlers = [
     return HttpResponse.json({ ok: true });
   }),
 
-  // Media handlers
+  // Media handlers (issue #136). The CMS UI now uses a sign-then-record
+  // upload flow (`POST /sign` returns a short-lived URL, the browser
+  // PUTs the binary to that URL, then `POST /api/cms/media` records
+  // the metadata pointing at the public URL). Mock mode mirrors that
+  // shape end-to-end so the picker exercises the same code path
+  // offline; the binary is stashed in a process-local map and served
+  // back from `/api/cms/media/mock-upload/:path`.
   http.get("/api/cms/media", async () => {
     const assets = await db.mediaAssets.toArray();
     return HttpResponse.json(
@@ -1301,9 +1318,64 @@ export const handlers = [
         alt: a.alt,
         focalPoint: a.focalPoint,
         createdAt: a.createdAt,
-        url: URL.createObjectURL(a.blob),
+        url: a.url || (a.blob ? URL.createObjectURL(a.blob) : ""),
       }))
     );
+  }),
+
+  http.post("/api/cms/media/sign", async ({ request }) => {
+    const denied = guardRole(request, "upload_media");
+    if (denied) {
+      return denied;
+    }
+    const body = (await request.json()) as {
+      filename?: string;
+      mimeType?: string;
+    };
+    if (!(body.filename && body.mimeType)) {
+      return HttpResponse.json(
+        { error: "filename and mimeType are required" },
+        { status: 400 }
+      );
+    }
+    const path = `media/${Date.now().toString(36)}-${body.filename}`;
+    mockPendingMediaUploads.set(path, {
+      filename: body.filename,
+      mimeType: body.mimeType,
+    });
+    return HttpResponse.json({
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      method: "PUT",
+      path,
+      provider: "mock",
+      publicUrl: `/api/cms/media/mock-upload/${encodeURIComponent(path)}`,
+      uploadUrl: `/api/cms/media/mock-upload/${encodeURIComponent(path)}`,
+    });
+  }),
+
+  http.put("/api/cms/media/mock-upload/:path", async ({ params, request }) => {
+    const path = decodeURIComponent(params.path as string);
+    const pending = mockPendingMediaUploads.get(path);
+    if (!pending) {
+      return HttpResponse.json(
+        { error: "Upload token not found" },
+        { status: 404 }
+      );
+    }
+    const blob = new Blob([await request.arrayBuffer()], {
+      type: pending.mimeType,
+    });
+    mockPendingMediaUploads.set(path, { ...pending, blob });
+    return new HttpResponse(null, { status: 200 });
+  }),
+
+  http.get("/api/cms/media/mock-upload/:path", ({ params }) => {
+    const path = decodeURIComponent(params.path as string);
+    const pending = mockPendingMediaUploads.get(path);
+    if (!pending?.blob) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return new HttpResponse(pending.blob, { status: 200 });
   }),
 
   http.post("/api/cms/media", async ({ request }) => {
@@ -1311,33 +1383,32 @@ export const handlers = [
     if (denied) {
       return denied;
     }
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) {
-      return HttpResponse.json({ error: "No file" }, { status: 400 });
+    const body = (await request.json()) as {
+      alt?: string;
+      filename?: string;
+      mimeType?: string;
+      path?: string;
+      provider?: string;
+      url?: string;
+    };
+    if (!(body.filename && body.mimeType && body.path && body.url)) {
+      return HttpResponse.json(
+        { error: "filename, mimeType, path and url are required" },
+        { status: 400 }
+      );
     }
-    const alt = (formData.get("alt") as string) || "";
-    const id = `media_${Date.now().toString(36)}`;
     const asset = {
-      id,
-      filename: file.name,
-      mimeType: file.type,
-      blob: new Blob([await file.arrayBuffer()], { type: file.type }),
-      alt,
+      id: `media_${Date.now().toString(36)}`,
+      filename: body.filename,
+      mimeType: body.mimeType,
+      path: body.path,
+      provider: body.provider || "mock",
+      url: body.url,
+      alt: body.alt || "",
       createdAt: new Date().toISOString(),
     };
     await db.mediaAssets.put(asset);
-    return HttpResponse.json(
-      {
-        id: asset.id,
-        filename: asset.filename,
-        mimeType: asset.mimeType,
-        alt: asset.alt,
-        createdAt: asset.createdAt,
-        url: URL.createObjectURL(asset.blob),
-      },
-      { status: 201 }
-    );
+    return HttpResponse.json(asset, { status: 201 });
   }),
 
   http.delete("/api/cms/media/:id", async ({ request, params }) => {
