@@ -9,11 +9,15 @@ import {
 } from "@verda/data";
 import {
   type Article,
-  type ArticleContributor,
   db,
   GROWTH_CONFIG_DEFAULT_ID,
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
 } from "./db";
+import {
+  buildReaderMemberSeed,
+  READER_ATTRIBUTION,
+  SEEDED_READER_MEMBERS,
+} from "./reader-seed-data";
 
 const SEED_KEY = "verda.seeded";
 
@@ -29,55 +33,16 @@ const PUBLIC_IMAGES = [
   { path: "/img/social/r03.webp", filename: "r03.webp" },
 ];
 
-/**
- * Per-item attribution + body seed for SOCIAL records (issue #75).
- *
- * The public `/readers/[slug]` view reads `bodyJson`, `src`, `sourceUrl`,
- * `license`, and `contributors` directly off the article record so each
- * submission/repost/remix renders its own authored content rather than a
- * shared hardcoded mockup. Keys are SOCIAL ids (`r01` … `r03`).
- */
-const READER_ATTRIBUTION: Record<
-  string,
-  {
-    body: string;
-    contributors: ArticleContributor[];
-    license: string;
-    sourceUrl: string;
-  }
-> = {
-  r01: {
-    body: "My mother boiled the turmeric for twenty-three minutes. She said she had stopped counting; the kitchen timer was broken. Twenty-three is now the number I keep.",
-    sourceUrl: "https://instagram.com/maya.cooks",
-    license: "Reader submission · used with permission",
-    contributors: [
-      { name: "@maya.cooks", role: "recipe + photograph", color: "#c87a3a" },
-    ],
-  },
-  r02: {
-    body: "Behind the stationery shop on Aoyama-dori, a tiny garden lives in salvaged pots. The owner waters everything by hand on Sundays. We asked, she said yes, we reposted.",
-    sourceUrl: "https://instagram.com/leaf",
-    license: "Reposted with permission · CC BY-NC 4.0",
-    contributors: [
-      { name: "@leaf", role: "original photograph", color: "#4a6b48" },
-    ],
-  },
-  r03: {
-    body: "Three readers sent us their May field notes. Studio H rearranged them into one continuous piece, with the originals lightly edited and clearly attributed.",
-    sourceUrl: "https://studioh.tw/field-notes",
-    license: "CC BY-NC 4.0",
-    contributors: [
-      { name: "@maya.cooks", role: "turmeric porridge note", color: "#c87a3a" },
-      { name: "@a.field", role: "two morning walks", color: "#4a6b48" },
-      { name: "@yu.papers", role: "three handwritten cards", color: "#9a4a68" },
-    ],
-  },
-};
-
 function readerSeedFor(s: Social): Article {
   const attr = READER_ATTRIBUTION[s.id];
-  const bodyText =
-    attr?.body ?? `${s.title} — sent in by ${s.src} on ${s.date}.`;
+  // Compose a Tiptap doc out of the attribution paragraphs so the public
+  // reader detail (#75) renders the seeded body the same way it would
+  // any CMS-authored article. Items missing an attribution entry fall
+  // back to a single-paragraph caption so the renderer still mounts.
+  const paragraphs =
+    attr?.body && attr.body.length > 0
+      ? attr.body
+      : [`${s.title} — sent in by ${s.src} on ${s.date}.`];
   return {
     id: s.id,
     slug: s.slug,
@@ -98,14 +63,18 @@ function readerSeedFor(s: Social): Article {
     sourceUrl: attr?.sourceUrl,
     license: attr?.license,
     contributors: attr?.contributors,
+    // Seeded reader items are editorially approved; mark them
+    // `published` so the public Readers listing (and the homepage
+    // reader sidebar) populates on first boot. The user-submission
+    // path (#91) keeps creating `pending` rows, which the listing
+    // continues to filter out.
+    status: "published",
     bodyJson: JSON.stringify({
       type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: bodyText }],
-        },
-      ],
+      content: paragraphs.map((text) => ({
+        type: "paragraph",
+        content: [{ type: "text", text }],
+      })),
     }),
   };
 }
@@ -213,96 +182,19 @@ export async function seedIfEmpty() {
     joined: MEMBER.joined,
   });
 
-  // Additional sample members so the CMS member admin list is exerciseable.
-  // Each gets a starter ledger / growth so the detail view shows live data.
-  await db.members.bulkPut([
-    {
-      id: "m_5102",
-      name: "Hana Watanabe",
-      email: "hana.w@example.com",
-      joined: "Joined April 2024",
-    },
-    {
-      id: "m_6033",
-      name: "Renji Park",
-      email: "renji.p@example.com",
-      joined: "Joined May 2024",
-    },
-    {
-      id: "m_7188",
-      name: "Aiko Sato",
-      email: "aiko.s@example.com",
-      joined: "Joined July 2024",
-    },
-  ]);
+  // Sample members beyond the logged-in MEMBER (issue #31 + #97). Every
+  // member here ships starter ledger / growth / behavior so the CMS
+  // member admin detail view shows live data and so each reader item's
+  // `submittedBy` (issue #97) maps to a real seeded member.
+  await db.members.bulkPut(SEEDED_READER_MEMBERS);
 
   const now = new Date().toISOString();
-  await db.pointLedger.bulkAdd([
-    {
-      memberId: "m_5102",
-      amount: 60,
-      balanceAfter: 60,
-      reason: "Onboarding bonus",
-      createdAt: now,
-    },
-    {
-      memberId: "m_6033",
-      amount: 25,
-      balanceAfter: 25,
-      reason: "Read · A walk after dinner",
-      createdAt: now,
-    },
-    {
-      memberId: "m_7188",
-      amount: 5,
-      balanceAfter: 5,
-      reason: "Daily check-in",
-      createdAt: now,
-    },
-  ]);
+  const memberSeed = buildReaderMemberSeed(now);
+  await db.pointLedger.bulkAdd(memberSeed.pointLedger);
 
-  await db.growthItems.bulkAdd([
-    {
-      memberId: "m_5102",
-      nutrients: 60,
-      level: 2,
-      sequence: 1,
-      createdAt: now,
-    },
-    {
-      memberId: "m_6033",
-      nutrients: 25,
-      level: 1,
-      sequence: 1,
-      createdAt: now,
-    },
-    {
-      memberId: "m_7188",
-      nutrients: 5,
-      level: 1,
-      sequence: 1,
-      createdAt: now,
-    },
-  ]);
+  await db.growthItems.bulkAdd(memberSeed.growthItems);
 
-  await db.behaviorLogs.bulkAdd([
-    {
-      memberId: "m_5102",
-      action: "login_91app",
-      createdAt: now,
-    },
-    {
-      memberId: "m_6033",
-      action: "read_complete",
-      articleId: "s04",
-      createdAt: now,
-    },
-    {
-      memberId: "m_7188",
-      action: "check_in",
-      createdAt: now,
-    },
-  ]);
+  await db.behaviorLogs.bulkAdd(memberSeed.behaviorLogs);
 
   await db.rewardRules.bulkPut([
     {
