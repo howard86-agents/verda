@@ -1,18 +1,84 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
+// Verda backend schema (issue #126).
+//
+// The walking skeleton models the read path for the public stories
+// surface: a typed editorial `Section` taxonomy and the `Article`
+// content row. Field names mirror the JSON contract the existing MSW
+// handler returns today so React Query callers stay unchanged when
+// `NEXT_PUBLIC_API_MODE=real` flips them onto the real Route Handlers.
+//
+// Later slices add Members, BehaviorLogs, GrowthItems, Comments,
+// Reactions, MemberBadges and the CMS authoring tables on top of
+// these two models — the schema is intentionally narrow here so the
+// tracer-bullet migration has a tight blast radius.
 datasource db {
   provider = "postgresql"
 }
 
 generator client {
   provider = "prisma-client-js"
-  output = "../generated/client"
+  output   = "../generated/client"
 }
 
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
+/// Editorial section taxonomy — Mindful Living, Nutrition, Movement,
+/// Earth & Garden, Recipes (issue #87 lifted from the in-browser
+/// Dexie store onto Postgres).
+model Section {
+  id   String @id
+  name String
+
+  @@map("sections")
+}
+
+/// A single article — brand longread or reader-contributed item.
+///
+/// `slug` is the public URL key and is unique. Field names match the
+/// JSON shape the public reader and CMS already consume so the MSW →
+/// Postgres cutover is invisible to callers. `series` and
+/// `contributors` are stored as JSON because they're nested objects /
+/// short arrays that don't need their own indexed tables yet.
+///
+/// The mirrored Dexie compound indexes are unary here — Dexie used
+/// `id, slug, kind, cat, tag, status, section, submittedBy` as
+/// individual indexes; we materialise the most common filters
+/// (`kind+status` for the public listing, `section`, `tag`,
+/// `submittedBy`) and keep `slug` unique for the per-article fetch.
+model Article {
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  kind         String    @default("brand")
+  cat          String    @default("")
+  tag          String    @default("")
+  title        String
+  jp           String    @default("")
+  sum          String    @default("")
+  img          String    @default("")
+  imagePrompt  String    @default("")
+  imageSeed    Int       @default(0)
+  read         Int       @default(0)
+  date         String    @default("")
+  author       String    @default("")
+  src          String?
+  sourceUrl    String?
+  license      String?
+  submittedBy  String?
+  contributors Json?
+  series       Json?
+  bodyJson     String?
+  status       String    @default("draft")
+  publishedAt  DateTime?
+  scheduledAt  DateTime?
+  // Section.id; not modeled as a relation yet so the migration matches
+  // the additive Dexie shape (issue #87). Issue #135 (taxonomy admin)
+  // promotes this to a relation if needed.
+  section      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind, status])
+  @@index([section])
+  @@index([tag])
+  @@index([submittedBy])
+  @@index([status])
+  @@map("articles")
 }
