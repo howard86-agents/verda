@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { CmsShell } from "@/_components/cms-shell";
 import { can, useCmsAuth } from "@/lib/cms-auth";
+import { COMMUNITY_REWARD_RULE_LABELS } from "@/lib/community-rewards";
 
 interface RewardRuleDTO {
   action: string;
@@ -24,6 +25,10 @@ const ACTION_LABELS: Record<string, { en: string; jp: string }> = {
   read_complete: { en: "Read complete", jp: "読了" },
   daily_check_in: { en: "Daily check-in", jp: "日次サイン" },
   collect: { en: "Collect", jp: "保存" },
+  // Community rules (issue #104). Source-of-truth for the labels lives
+  // in `lib/community-rewards.ts` so the CMS rules editor and the
+  // runtime handlers stay in sync.
+  ...COMMUNITY_REWARD_RULE_LABELS,
 };
 
 function actionLabel(action: string) {
