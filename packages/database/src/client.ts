@@ -5,7 +5,13 @@ import { PrismaClient } from "../generated/client";
 // directly from `@verda/database` alongside the runtime `prisma`
 // client. We avoid an `index.ts` barrel because the project's
 // `noBarrelFile` lint rule discourages re-export-only files.
-export type { Article, Prisma, Section } from "../generated/client";
+export type {
+  $Enums,
+  Article,
+  Prisma,
+  Section,
+  User,
+} from "../generated/client";
 
 // Pass the connection string directly to PrismaPg rather than a
 // pre-constructed `pg.Pool` instance. The adapter ships its own pinned

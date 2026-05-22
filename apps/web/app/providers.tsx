@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SessionProvider } from "next-auth/react";
 import {
   createContext,
   useCallback,
@@ -11,7 +12,6 @@ import {
 } from "react";
 import { AppSplash } from "./_components/app-splash";
 import { RewardToastProvider } from "./_components/reward-toast";
-import { AuthProvider } from "./lib/auth";
 import { CmsAuthProvider } from "./lib/cms-auth";
 import { GA4Provider } from "./lib/ga4-provider";
 import { seedIfEmpty } from "./lib/seed";
@@ -90,13 +90,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeContext.Provider value={value}>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
+        <SessionProvider>
           <CmsAuthProvider>
             <RewardToastProvider>
               <GA4Provider>{children}</GA4Provider>
             </RewardToastProvider>
           </CmsAuthProvider>
-        </AuthProvider>
+        </SessionProvider>
       </QueryClientProvider>
     </ThemeContext.Provider>
   );
