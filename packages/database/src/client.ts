@@ -8,6 +8,8 @@ import { PrismaClient } from "../generated/client";
 export type {
   $Enums,
   Article,
+  AuditLog,
+  MemberProfile,
   Prisma,
   Section,
   User,
