@@ -8,7 +8,8 @@ type EventName =
   | "story_uncollect"
   | "daily_check_in"
   | "admin_article_publish"
-  | "growth_item_redeemed";
+  | "growth_item_redeemed"
+  | "reader_submission_created";
 
 interface TrackEvent {
   name: EventName;

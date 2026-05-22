@@ -75,6 +75,12 @@ export default function ReadersPage() {
             <p className="mt-4 max-w-[500px] font-display text-[16px] text-muted italic leading-[1.6]">
               Submissions, reposts, and remixes from the community.
             </p>
+            <Link
+              className="mt-5 inline-flex items-center gap-2 border border-ink bg-ink px-[18px] py-2 font-mono text-[10.5px] text-cream uppercase tracking-[0.18em]"
+              href="/readers/submit"
+            >
+              Submit yours · 投稿する →
+            </Link>
           </div>
         </section>
 
