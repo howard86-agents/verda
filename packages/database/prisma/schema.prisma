@@ -111,6 +111,9 @@ model User {
   accounts      Account[]
   sessions      Session[]
   memberProfile MemberProfile?
+  behaviorLogs  BehaviorLog[]
+  pointLedger   PointLedgerEntry[]
+  growthItems   GrowthItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -186,4 +189,89 @@ model MemberProfile {
   updatedAt DateTime @updatedAt
 
   @@map("member_profiles")
+}
+
+/// Gamification: reward rules (issue #130). Each row defines the
+/// points awarded for an action and the deduplication strategy.
+model RewardRule {
+  id        String  @id
+  action    String  @unique
+  points    Int
+  enabled   Boolean @default(true)
+  limitType String  @default("per-article")
+
+  @@map("reward_rules")
+}
+
+/// Gamification: growth rules (issue #130). Level thresholds and
+/// display names for the growth-item progression.
+model GrowthRule {
+  level     Int    @id
+  name      String
+  jp        String @default("")
+  threshold Int
+
+  @@map("growth_rules")
+}
+
+/// Gamification: growth config (issue #130). Single-row config table
+/// holding the growth-item quantity cap.
+model GrowthConfig {
+  id                String @id @default("default")
+  maxItemsPerMember Int    @default(3)
+
+  @@map("growth_config")
+}
+
+/// Gamification: behavior log (issue #130). Records every rewarded
+/// action. The unique constraint on [userId, action, articleId]
+/// enforces per-article idempotency at the DB level.
+model BehaviorLog {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  action    String
+  articleId String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, action, articleId])
+  @@index([userId])
+  @@map("behavior_logs")
+}
+
+/// Gamification: point ledger (issue #130). Append-only ledger of
+/// point awards with running balance.
+model PointLedgerEntry {
+  id           Int      @id @default(autoincrement())
+  userId       String
+  amount       Int
+  balanceAfter Int
+  reason       String
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("point_ledger")
+}
+
+/// Gamification: growth item (issue #130). Each member holds up to
+/// `growthConfig.maxItemsPerMember` items. The active item receives
+/// nutrients; completed items become redeemable.
+model GrowthItem {
+  id           Int       @id @default(autoincrement())
+  userId       String
+  nutrients    Int       @default(0)
+  level        Int       @default(1)
+  sequence     Int       @default(1)
+  completedAt  DateTime?
+  redeemedAt   DateTime?
+  redemptionId String?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("growth_items")
 }
