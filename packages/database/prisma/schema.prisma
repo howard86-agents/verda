@@ -275,3 +275,47 @@ model GrowthItem {
   @@index([userId])
   @@map("growth_items")
 }
+
+/// Reader engagement: saved article collection (issue #131).
+/// Unique on [userId, articleId] — a user can save an article once.
+model Collection {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  articleId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, articleId])
+  @@index([userId])
+  @@map("collections")
+}
+
+/// Reader engagement: article comment (issue #131).
+/// Soft-removal via `removedAt` — removed comments are hidden from
+/// readers but visible to CMS moderators.
+model Comment {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  articleId String
+  body      String
+  removedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([articleId, createdAt])
+  @@index([userId])
+  @@map("comments")
+}
+
+/// Reader engagement: article reaction (issue #131).
+/// Unique on [userId, articleId, kind] — one reaction per kind per
+/// user per article. `kind` is one of grew/learned/loved.
+model Reaction {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  articleId String
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, articleId, kind])
+  @@index([articleId])
+  @@map("reactions")
+}
