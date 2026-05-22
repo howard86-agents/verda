@@ -393,6 +393,42 @@ export const migratedSearchHandlers = [
   }),
 ];
 
+// Public reader profile (issue #139). Same migration pattern as
+// `migratedStoriesHandlers` and `migratedSearchHandlers`:
+// `mocks/browser.ts` drops these handlers when `NEXT_PUBLIC_API_MODE=real`
+// so the request bypasses MSW and hits the Postgres-backed Route
+// Handler at `apps/web/app/api/readers/u/[id]/route.ts`. Default
+// (`mock`) keeps the legacy Dexie-backed handler that composes the
+// public profile from the in-browser store.
+export const migratedReaderProfileHandlers = [
+  http.get("/api/readers/u/:id", async ({ params }) => {
+    const id = params.id as string;
+    const member = await db.members.get(id);
+    const articles = await db.articles
+      .where("submittedBy")
+      .equals(id)
+      .toArray();
+    const growthItems = await db.growthItems
+      .where("memberId")
+      .equals(id)
+      .toArray();
+    const growthRules = await db.growthRules.toArray();
+    const badges = await db.memberBadges.where("memberId").equals(id).toArray();
+
+    const profile = composePublicReaderProfile({
+      member,
+      articles,
+      growthItems,
+      growthRules,
+      badges,
+    });
+    if (!profile) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return HttpResponse.json(profile);
+  }),
+];
+
 export const handlers = [
   ...migratedStoriesHandlers,
 
@@ -712,38 +748,7 @@ export const handlers = [
     }
   }),
 
-  // Public reader profile (issue #103) — composes the member, their
-  // active growth item summary, and their approved submissions into a
-  // narrow, privacy-filtered payload. Returns 404 for unknown or
-  // soft-deleted members. Email and the private nutrient ledger are
-  // never part of this payload. Issue #105 adds the earned-badge
-  // shelf alongside.
-  http.get("/api/readers/u/:id", async ({ params }) => {
-    const id = params.id as string;
-    const member = await db.members.get(id);
-    const articles = await db.articles
-      .where("submittedBy")
-      .equals(id)
-      .toArray();
-    const growthItems = await db.growthItems
-      .where("memberId")
-      .equals(id)
-      .toArray();
-    const growthRules = await db.growthRules.toArray();
-    const badges = await db.memberBadges.where("memberId").equals(id).toArray();
-
-    const profile = composePublicReaderProfile({
-      member,
-      articles,
-      growthItems,
-      growthRules,
-      badges,
-    });
-    if (!profile) {
-      return HttpResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    return HttpResponse.json(profile);
-  }),
+  ...migratedReaderProfileHandlers,
 
   ...migratedSearchHandlers,
 
