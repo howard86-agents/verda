@@ -8,6 +8,7 @@ import { CoverImage } from "@/_components/cover-image";
 import { Eyebrow } from "@/_components/eyebrow";
 import { IconBookmark, IconFilter } from "@/_components/glyphs";
 import type { Article } from "@/lib/db";
+import { sectionLabel, seriesPartLabel } from "@/lib/section";
 
 type SortKey = "latest" | "recommended" | "popular";
 
@@ -222,11 +223,16 @@ export default function StoriesPage() {
                   </Link>
                   <div className="mt-4 border-line border-b pb-[18px]">
                     <div className="font-mono text-[10px] text-muted uppercase tracking-[0.18em]">
-                      {s.cat} · {s.read} min · {s.date}
+                      {sectionLabel(s)} · {s.read} min · {s.date}
                     </div>
                     <h3 className="mt-[6px] font-display font-medium text-[24px] leading-[1.12] tracking-[-0.005em]">
                       <Link href={`/stories/${s.slug}`}>{s.title}</Link>
                     </h3>
+                    {seriesPartLabel(s.series) && (
+                      <div className="mt-[4px] font-mono text-[10px] text-vermilion uppercase tracking-[0.18em]">
+                        {seriesPartLabel(s.series)}
+                      </div>
+                    )}
                     <div className="mt-1 font-display text-[14px] text-muted italic">
                       {s.jp}
                     </div>

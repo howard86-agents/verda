@@ -6,6 +6,72 @@ export type StoryKind = "brand";
 /** Cover-image categories — the public/img/<kind>/ folders the CLI writes. */
 export type ImageKind = "stories" | "social";
 
+/**
+ * The canonical content sections (issue #87).
+ *
+ * `Section` is a first-class content-model concept that replaces the older
+ * free-form `cat` string for grouping stories. The five values are the
+ * existing brand categories — Mindful Living, Nutrition, Movement, Earth &
+ * Garden, and Recipes — promoted to a typed taxonomy so listing filters,
+ * section-browse pages (#98), search (#99), and related-content (#100)
+ * can rely on a stable, queryable set rather than a free-form label.
+ */
+export interface Section {
+  /** Stable id used as the storage key (e.g. `mindful-living`). */
+  id: string;
+  /** Display name shown in the UI (e.g. `Mindful Living`). */
+  name: string;
+}
+
+/**
+ * Multi-part-story grouping (issue #87).
+ *
+ * A story belongs to a series via `{ name, ordinal }` (e.g.
+ * `{ name: "Quiet rituals", ordinal: 1 }`). The renderer uses `ordinal`
+ * to surface a `Part 01 · 02` indicator on the public reader and on the
+ * story card. Series is purely additive — most stories carry no series.
+ */
+export interface SeriesRef {
+  /** Display name of the series (e.g. `Quiet rituals`). */
+  name: string;
+  /** 1-based part number within the series. */
+  ordinal: number;
+}
+
+/**
+ * The five canonical sections seeded into the content store.
+ *
+ * Order is editorial (Mindful Living first); the seeder iterates this list
+ * to prime the `sections` table on first boot, and the CMS editor + the
+ * public listing render selects from these ids.
+ */
+export const SECTIONS: Section[] = [
+  { id: "mindful-living", name: "Mindful Living" },
+  { id: "nutrition", name: "Nutrition" },
+  { id: "movement", name: "Movement" },
+  { id: "earth-garden", name: "Earth & Garden" },
+  { id: "recipes", name: "Recipes" },
+];
+
+/**
+ * Convenience: the editorial section names. Used by the listing's section
+ * filter buttons; mirrors the `name` field of `SECTIONS` in display order.
+ */
+export const SECTION_NAMES: string[] = SECTIONS.map((s) => s.name);
+
+/**
+ * Map a free-form `cat` label to a canonical section id. Returns
+ * `undefined` if no canonical section matches; callers fall back to
+ * the legacy `cat` string in that case (additive migration, issue #87).
+ */
+export function sectionIdFromCat(cat: string | undefined): string | undefined {
+  if (!cat) {
+    return;
+  }
+  const target = cat.trim().toLowerCase();
+  return SECTIONS.find((s) => s.name.toLowerCase() === target)?.id;
+}
+
 export interface Story {
   author: string;
   cat: string;
@@ -20,7 +86,22 @@ export interface Story {
   kind: StoryKind;
   /** Reading time in minutes. */
   read: number;
+  /**
+   * Stable id of the section this story belongs to (issue #87). Mirrors a
+   * row in `SECTIONS`; `cat` is kept alongside for back-compat with the
+   * existing CMS filter and listing API while the content model migrates.
+   */
+  section: string;
+  /** Optional multi-part-series grouping (issue #87). */
+  series?: SeriesRef;
   slug: string;
+  /**
+   * Optional reference to the member who submitted this content (issue #87).
+   * Brand stories leave this unset; reader-contributed items (kind=social)
+   * carry a real member id so the public reader profile (#103) and the
+   * community reward pipeline (#104) can attribute them.
+   */
+  submittedBy?: string;
   sum: string;
   tag: string;
   title: string;
@@ -31,6 +112,8 @@ export const STORIES: Story[] = [
     id: "s01",
     slug: "quiet-rituals-slower-morning",
     cat: "Mindful Living",
+    section: "mindful-living",
+    series: { name: "Quiet rituals", ordinal: 1 },
     tag: "morning",
     title: "The quiet rituals that shape a slower morning",
     jp: "静かな朝の儀式",
@@ -48,6 +131,7 @@ export const STORIES: Story[] = [
     id: "s02",
     slug: "spring-bowl-five-colors",
     cat: "Nutrition",
+    section: "nutrition",
     tag: "recipe",
     title: "A spring bowl, in five colors",
     jp: "春の五色丼",
@@ -65,6 +149,7 @@ export const STORIES: Story[] = [
     id: "s03",
     slug: "reading-the-soil",
     cat: "Earth & Garden",
+    section: "earth-garden",
     tag: "season",
     title: "Reading the soil — what your basil is telling you",
     jp: "土を読む",
@@ -82,6 +167,7 @@ export const STORIES: Story[] = [
     id: "s04",
     slug: "a-walk-after-dinner",
     cat: "Movement",
+    section: "movement",
     tag: "practice",
     title: "A walk, after dinner, in any weather",
     jp: "夕食後の一歩",
@@ -99,6 +185,8 @@ export const STORIES: Story[] = [
     id: "s05",
     slug: "paper-journal-week-19",
     cat: "Mindful Living",
+    section: "mindful-living",
+    series: { name: "Quiet rituals", ordinal: 2 },
     tag: "journal",
     title: "Notes from a paper journal, week 19",
     jp: "手帳の余白",
@@ -116,6 +204,7 @@ export const STORIES: Story[] = [
     id: "s06",
     slug: "six-pantry-items",
     cat: "Nutrition",
+    section: "nutrition",
     tag: "pantry",
     title: "Six pantry items I now refuse to be without",
     jp: "六つの常備品",
@@ -142,6 +231,12 @@ export interface Social {
   kind: SocialKind;
   slug: string;
   src: string;
+  /**
+   * Optional id of the member who submitted this reader item (issue #87).
+   * Used by reader profiles (#103) and the community reward pipeline (#104)
+   * to attribute submissions/reposts/remixes back to a real member.
+   */
+  submittedBy?: string;
   tag: string;
   title: string;
 }
@@ -152,6 +247,7 @@ export const SOCIAL: Social[] = [
     slug: "turmeric-porridge",
     kind: "submission",
     src: "@maya.cooks",
+    submittedBy: "m_5102",
     title: "Reader recipe: turmeric porridge, my mother's way",
     tag: "reader",
     img: "linear-gradient(135deg, #f3d6a8, #c87a3a)",
@@ -165,6 +261,7 @@ export const SOCIAL: Social[] = [
     slug: "pop-up-garden",
     kind: "repost",
     src: "Instagram · @leaf",
+    submittedBy: "m_6033",
     title: "A pop-up garden in the city, behind a stationery shop",
     tag: "spotted",
     img: "linear-gradient(135deg, #c8d8c4, #4a6b48)",
@@ -178,6 +275,7 @@ export const SOCIAL: Social[] = [
     slug: "field-notes-remix",
     kind: "remix",
     src: "Verda × @studioh",
+    submittedBy: "m_7188",
     title: "Field notes — a remix of three reader essays",
     tag: "remix",
     img: "linear-gradient(135deg, #e9c4d0, #9a4a68)",

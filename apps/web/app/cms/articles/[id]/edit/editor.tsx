@@ -6,7 +6,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Youtube from "@tiptap/extension-youtube";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { CATEGORIES } from "@verda/data";
+import { CATEGORIES, SECTIONS } from "@verda/data";
 import NextLink from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArticlePreview } from "@/_components/article-preview";
@@ -27,8 +27,14 @@ interface ArticleData {
   kind: string;
   publishedAt?: string;
   scheduledAt?: string;
+  /** Canonical section id (issue #87). */
+  section?: string;
+  /** Multi-part-series grouping (issue #87). */
+  series?: { name: string; ordinal: number };
   slug: string;
   status: string;
+  /** Member id for reader-contributed items (issue #87). */
+  submittedBy?: string;
   tag: string;
   title: string;
 }
@@ -164,6 +170,75 @@ async function recordVersion(args: {
   });
 }
 
+/**
+ * Build the optional `series` payload for save (issue #87). Returns
+ * undefined unless both a non-empty name and a positive integer ordinal
+ * are supplied so partial UI input doesn't overwrite an existing series
+ * with a half-formed object.
+ */
+function composeSeriesPayload(
+  name: string,
+  ordinal: string
+): { name: string; ordinal: number } | undefined {
+  const trimmed = name.trim();
+  const ordinalNum = Number.parseInt(ordinal, 10);
+  if (!(trimmed && Number.isFinite(ordinalNum)) || ordinalNum <= 0) {
+    return;
+  }
+  return { name: trimmed, ordinal: ordinalNum };
+}
+
+/**
+ * Apply a freshly-loaded `ArticleData` payload to the editor's local
+ * state. Pulled out of the load `useEffect` so its callback stays under
+ * the cognitive-complexity cap once issue #87's section/series/submittedBy
+ * fields land alongside the existing eight or so setters.
+ */
+function applyArticleToState(
+  data: ArticleData,
+  setters: {
+    setArticle: (a: ArticleData) => void;
+    setAuthor: (s: string) => void;
+    setCat: (s: string) => void;
+    setCoverAssetId: (s: string | null) => void;
+    setCoverFocalPoint: (fp: { x: number; y: number }) => void;
+    setCoverUrl: (s: string | null) => void;
+    setJp: (s: string) => void;
+    setKind: (s: string) => void;
+    setSection: (s: string) => void;
+    setSeriesName: (s: string) => void;
+    setSeriesOrdinal: (s: string) => void;
+    setSlug: (s: string) => void;
+    setSubmittedBy: (s: string) => void;
+    setTag: (s: string) => void;
+    setTitle: (s: string) => void;
+  }
+): void {
+  setters.setArticle(data);
+  setters.setTitle(data.title);
+  setters.setJp(data.jp || "");
+  setters.setSlug(data.slug);
+  setters.setCat(data.cat);
+  setters.setSection(data.section ?? "");
+  setters.setSeriesName(data.series?.name ?? "");
+  setters.setSeriesOrdinal(
+    data.series?.ordinal == null ? "" : String(data.series.ordinal)
+  );
+  setters.setSubmittedBy(data.submittedBy ?? "");
+  setters.setTag(data.tag);
+  setters.setAuthor(data.author);
+  setters.setKind(data.kind);
+  if (data.coverAssetId) {
+    setters.setCoverAssetId(data.coverAssetId);
+  }
+  if (data.coverUrl) {
+    setters.setCoverUrl(data.coverUrl);
+  }
+  if (data.coverFocalPoint) {
+    setters.setCoverFocalPoint(data.coverFocalPoint);
+  }
+}
+
 export function ArticleEditor({ articleId }: { articleId: string | null }) {
   const { role } = useCmsAuth();
   // `currentId` tracks the canonical id the editor is operating against. It
@@ -176,6 +251,10 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
   const [jp, setJp] = useState("");
   const [slug, setSlug] = useState("");
   const [cat, setCat] = useState("");
+  const [section, setSection] = useState("");
+  const [seriesName, setSeriesName] = useState("");
+  const [seriesOrdinal, setSeriesOrdinal] = useState("");
+  const [submittedBy, setSubmittedBy] = useState("");
   const [tag, setTag] = useState("");
   const [author, setAuthor] = useState("");
   const [kind, setKind] = useState("brand");
@@ -249,23 +328,23 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
     fetch(`/api/cms/articles/${articleId}`)
       .then((r) => r.json())
       .then((data: ArticleData) => {
-        setArticle(data);
-        setTitle(data.title);
-        setJp(data.jp || "");
-        setSlug(data.slug);
-        setCat(data.cat);
-        setTag(data.tag);
-        setAuthor(data.author);
-        setKind(data.kind);
-        if (data.coverAssetId) {
-          setCoverAssetId(data.coverAssetId);
-        }
-        if (data.coverUrl) {
-          setCoverUrl(data.coverUrl);
-        }
-        if (data.coverFocalPoint) {
-          setCoverFocalPoint(data.coverFocalPoint);
-        }
+        applyArticleToState(data, {
+          setArticle,
+          setAuthor,
+          setCat,
+          setCoverAssetId,
+          setCoverFocalPoint,
+          setCoverUrl,
+          setJp,
+          setKind,
+          setSection,
+          setSeriesName,
+          setSeriesOrdinal,
+          setSlug,
+          setSubmittedBy,
+          setTag,
+          setTitle,
+        });
         if (data.bodyJson && editor) {
           try {
             editor.commands.setContent(JSON.parse(data.bodyJson));
@@ -296,6 +375,9 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
       jp,
       slug,
       cat,
+      section: section || undefined,
+      series: composeSeriesPayload(seriesName, seriesOrdinal),
+      submittedBy: submittedBy.trim() || undefined,
       tag,
       author,
       kind,
@@ -345,6 +427,10 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
     jp,
     slug,
     cat,
+    section,
+    seriesName,
+    seriesOrdinal,
+    submittedBy,
     tag,
     author,
     kind,
@@ -612,6 +698,65 @@ export function ArticleEditor({ articleId }: { articleId: string | null }) {
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="block">
+                <span className="font-mono text-[9.5px] text-muted uppercase tracking-[0.14em]">
+                  Section
+                </span>
+                <select
+                  className="mt-1 w-full border border-line bg-paper px-2 py-1 font-sans text-[12px]"
+                  disabled={!canEdit}
+                  onChange={(e) => setSection(e.target.value)}
+                  value={section}
+                >
+                  <option value="">No section</option>
+                  {SECTIONS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="grid grid-cols-[1fr_80px] gap-2">
+                <label className="block">
+                  <span className="font-mono text-[9.5px] text-muted uppercase tracking-[0.14em]">
+                    Series name
+                  </span>
+                  <input
+                    className="mt-1 w-full border border-line bg-paper px-2 py-1 font-sans text-[12px]"
+                    disabled={!canEdit}
+                    onChange={(e) => setSeriesName(e.target.value)}
+                    placeholder="Optional"
+                    value={seriesName}
+                  />
+                </label>
+                <label className="block">
+                  <span className="font-mono text-[9.5px] text-muted uppercase tracking-[0.14em]">
+                    Part #
+                  </span>
+                  <input
+                    className="mt-1 w-full border border-line bg-paper px-2 py-1 font-sans text-[12px]"
+                    disabled={!canEdit}
+                    inputMode="numeric"
+                    onChange={(e) =>
+                      setSeriesOrdinal(e.target.value.replace(/\D+/g, ""))
+                    }
+                    placeholder="—"
+                    value={seriesOrdinal}
+                  />
+                </label>
+              </div>
+              <label className="block">
+                <span className="font-mono text-[9.5px] text-muted uppercase tracking-[0.14em]">
+                  Submitted by (member id)
+                </span>
+                <input
+                  className="mt-1 w-full border border-line bg-paper px-2 py-1 font-sans text-[12px]"
+                  disabled={!canEdit}
+                  onChange={(e) => setSubmittedBy(e.target.value)}
+                  placeholder="Reader-contributed only"
+                  value={submittedBy}
+                />
               </label>
               <label className="block">
                 <span className="font-mono text-[9.5px] text-muted uppercase tracking-[0.14em]">
