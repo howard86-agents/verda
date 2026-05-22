@@ -1,6 +1,7 @@
 import { prisma } from "@verda/database";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
+import { evaluateBadges } from "../../../badges/evaluate";
 
 // Comments API (issue #131).
 // GET  /api/articles/:id/comments — newest-first, hides removed.
@@ -48,6 +49,7 @@ export async function POST(
 
   // Award comment_post points (once per article)
   await awardCommentPost(userId, articleId);
+  await evaluateBadges(userId);
 
   return NextResponse.json({ comment }, { status: 201 });
 }

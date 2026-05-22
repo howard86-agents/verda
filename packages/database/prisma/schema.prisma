@@ -319,3 +319,16 @@ model Reaction {
   @@index([articleId])
   @@map("reactions")
 }
+
+/// Achievement badges (issue #138). Unique on [userId, badgeId] so
+/// a badge is granted exactly once per user.
+model MemberBadge {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  badgeId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@map("member_badges")
+}

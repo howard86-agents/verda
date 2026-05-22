@@ -1,5 +1,6 @@
 import { prisma } from "@verda/database";
 import { NextResponse } from "next/server";
+import { evaluateBadges } from "../badges/evaluate";
 
 // POST /api/events — gamification event handler (issue #130).
 //
@@ -56,6 +57,7 @@ async function handleReadComplete(
   }
 
   const streakResult = await awardPoints(userId, "streak_bonus");
+  const newBadges = await evaluateBadges(userId);
 
   return NextResponse.json({
     ok: true,
@@ -64,7 +66,7 @@ async function handleReadComplete(
     level: streakResult?.level ?? result.level,
     streak: 0,
     streakPoints: streakResult?.points ?? 0,
-    newBadges: [],
+    newBadges,
   });
 }
 
@@ -78,6 +80,7 @@ async function handleCheckIn(userId: string): Promise<Response> {
   }
 
   const streakResult = await awardPoints(userId, "streak_bonus");
+  const newBadges = await evaluateBadges(userId);
 
   return NextResponse.json({
     ok: true,
@@ -86,7 +89,7 @@ async function handleCheckIn(userId: string): Promise<Response> {
     level: streakResult?.level ?? result.level,
     streak: 0,
     streakPoints: streakResult?.points ?? 0,
-    newBadges: [],
+    newBadges,
   });
 }
 

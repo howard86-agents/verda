@@ -1,6 +1,7 @@
 import { prisma } from "@verda/database";
 import { NextResponse } from "next/server";
 import { auth } from "../../../auth";
+import { evaluateBadges } from "../badges/evaluate";
 
 // Collections API (issue #131).
 // GET  /api/collections — list saved articles for the current user.
@@ -43,6 +44,7 @@ export async function POST(request: Request): Promise<Response> {
 
     // Award collect points (idempotent via behavior_logs unique constraint)
     await awardCollect(userId, articleId);
+    await evaluateBadges(userId);
 
     return NextResponse.json({ item }, { status: 201 });
   } catch (error: unknown) {
