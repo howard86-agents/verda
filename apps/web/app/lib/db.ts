@@ -253,6 +253,32 @@ export interface ArticleVersion {
   timestamp: string;
 }
 
+/**
+ * A flat, live, public comment posted by a signed-in member on an
+ * article (issue #89). Comments are listed newest-first and post live
+ * (no pre-moderation, per the agreed trust model). Removal happens later
+ * via the CMS comment-moderation slice (#101); this surface only
+ * supports create + list + soft-removal flag for forward compat.
+ */
+export interface Comment {
+  /** ID of the article the comment is attached to. */
+  articleId: string;
+  /** ISO timestamp the comment was posted. */
+  createdAt: string;
+  /** Stable id (unique). */
+  id: string;
+  /** Member-id of the author. */
+  memberId: string;
+  /** Display-name snapshot taken at post time so a member rename can't
+   *  retroactively rewrite history; the public reader uses this as-is. */
+  memberName: string;
+  /** Marker set when CMS moderation removes the comment (#101). */
+  removedAt?: string;
+  /** Plain-text comment body. Bodies are short and unformatted in this
+   *  slice; rich-text comments aren't a goal for #89. */
+  text: string;
+}
+
 const db = new Dexie("verda") as Dexie & {
   articles: EntityTable<Article, "id">;
   members: EntityTable<Member, "id">;
@@ -270,6 +296,7 @@ const db = new Dexie("verda") as Dexie & {
   auditLog: EntityTable<AuditLog, "id">;
   redemptions: EntityTable<Redemption, "id">;
   sections: EntityTable<SectionRow, "id">;
+  comments: EntityTable<Comment, "id">;
 };
 
 db.version(1).stores({
@@ -349,6 +376,16 @@ db.version(4).stores({
 db.version(5).stores({
   articles: "id, slug, kind, cat, tag, status, section, submittedBy",
   sections: "id, name",
+});
+
+// v6 — issue #89: flat live comments on articles.
+// Adds the `comments` table indexed by article + creation time so the
+// public reader can fetch newest-first comments per article without a
+// full scan. Indexed on memberId too so the future moderation surface
+// (#101) can pull all comments by an author. Bumped to v6 in rebase
+// because #87 already claimed v5 with the section taxonomy.
+db.version(6).stores({
+  comments: "id, articleId, memberId, createdAt",
 });
 
 export { db };

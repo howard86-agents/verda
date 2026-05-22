@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ArticleBody } from "@/_components/article-body";
+import { ArticleComments } from "@/_components/article-comments";
 import { CoverImage } from "@/_components/cover-image";
 import { IconBookmark, IconShare } from "@/_components/glyphs";
 import { useRewardToast } from "@/_components/reward-toast";
@@ -319,6 +320,14 @@ function DetailReaderBody({ article }: { article: Article }) {
 
           {/* Right sidebar — author + reward + read next */}
           <DetailSidebar article={article} initial={initial} />
+        </section>
+
+        <section className="grid grid-cols-[1fr_720px_1fr] items-start gap-10 max-[1100px]:grid-cols-1">
+          <div className="max-[1100px]:hidden" />
+          <div className="mx-auto w-full max-w-[720px]">
+            <ArticleComments articleId={article.id} />
+          </div>
+          <div className="max-[1100px]:hidden" />
         </section>
 
         <div className="h-20" />

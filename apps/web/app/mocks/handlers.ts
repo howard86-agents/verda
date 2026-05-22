@@ -2,6 +2,7 @@ import { HttpResponse, http } from "msw";
 import { adjustPoints, currentBalance, softDeleteMember } from "@/lib/audit";
 import type { CmsAction, CmsRole } from "@/lib/cms-auth";
 import { can } from "@/lib/cms-auth";
+import { listComments, postComment } from "@/lib/comments";
 import {
   db,
   GROWTH_CONFIG_DEFAULT_ID,
@@ -706,6 +707,47 @@ export const handlers = [
 
     return HttpResponse.json({ ok: true });
   }),
+
+  // Story comments (issue #89). Reads are public; writes require a
+  // signed-in member id in the body. Newest-first ordering and
+  // soft-removal filtering live in the helper so the same shape is
+  // exercised by tests.
+  http.get("/api/articles/:articleId/comments", async ({ params }) => {
+    const articleId = params.articleId as string;
+    const comments = await listComments(articleId);
+    return HttpResponse.json({ items: comments });
+  }),
+
+  http.post(
+    "/api/articles/:articleId/comments",
+    async ({ request, params }) => {
+      const articleId = params.articleId as string;
+      const body = (await request.json()) as {
+        memberId?: string;
+        memberName?: string;
+        text?: string;
+      };
+      if (!body.memberId) {
+        return HttpResponse.json(
+          { error: "Sign in to post a comment" },
+          { status: 401 }
+        );
+      }
+      if (!body.text?.trim()) {
+        return HttpResponse.json(
+          { error: "Comment text cannot be empty" },
+          { status: 400 }
+        );
+      }
+      const comment = await postComment({
+        articleId,
+        memberId: body.memberId,
+        memberName: body.memberName ?? "",
+        text: body.text,
+      });
+      return HttpResponse.json(comment, { status: 201 });
+    }
+  ),
 
   // Taxonomy: Categories
   http.get("/api/cms/categories", async () => {
