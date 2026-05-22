@@ -1,6 +1,7 @@
 import { prisma } from "@verda/database";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
+import { evaluateBadges } from "../../../badges/evaluate";
 
 // Reactions API (issue #131).
 // GET  /api/articles/:id/reactions — aggregated counts + user's reactions.
@@ -72,6 +73,7 @@ export async function POST(
 
   // Award reaction_react points (once per article, regardless of kind)
   await awardReaction(userId, articleId);
+  await evaluateBadges(userId);
 
   return NextResponse.json({ toggled: true }, { status: 201 });
 }
