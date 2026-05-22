@@ -2,6 +2,7 @@ import {
   CATEGORIES,
   GROWTH_LEVELS,
   MEMBER,
+  SECTIONS,
   SOCIAL,
   type Social,
   STORIES,
@@ -93,6 +94,7 @@ function readerSeedFor(s: Social): Article {
     date: s.date,
     author: "",
     src: s.src,
+    submittedBy: s.submittedBy,
     sourceUrl: attr?.sourceUrl,
     license: attr?.license,
     contributors: attr?.contributors,
@@ -157,6 +159,8 @@ export async function seedIfEmpty() {
       slug: s.slug,
       kind: s.kind,
       cat: s.cat,
+      section: s.section,
+      series: s.series,
       tag: s.tag,
       title: s.title,
       jp: s.jp,
@@ -167,6 +171,7 @@ export async function seedIfEmpty() {
       read: s.read,
       date: s.date,
       author: s.author,
+      submittedBy: s.submittedBy,
       status: "published",
       bodyJson: JSON.stringify({
         type: "doc",
@@ -181,6 +186,11 @@ export async function seedIfEmpty() {
   );
 
   await db.articles.bulkPut(SOCIAL.map((s) => readerSeedFor(s)));
+
+  // Seed the canonical editorial sections (issue #87) so section-aware
+  // surfaces — listing filter, browse pages (#98), search (#99) — can
+  // query the taxonomy directly rather than re-deriving it from articles.
+  await db.sections.bulkPut(SECTIONS);
 
   await db.growthRules.bulkPut(
     GROWTH_LEVELS.map((g) => ({
@@ -341,6 +351,75 @@ export async function seedIfEmpty() {
   );
 
   await seedMedia();
+
+  // Seed a handful of comments so the public reader looks alive on first
+  // boot (issue #89). Spread across two stories so the empty state is
+  // also exercised on the rest.
+  await db.comments.bulkPut([
+    {
+      id: "cmt_seed_01",
+      articleId: "s01",
+      memberId: "m_5102",
+      memberName: "Hana Watanabe",
+      text: "The 'one small thing' framing landed for me. I've been overcomplicating mornings.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
+    },
+    {
+      id: "cmt_seed_02",
+      articleId: "s01",
+      memberId: "m_6033",
+      memberName: "Renji Park",
+      text: "Reading this on the train; somehow it slowed the train down too.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+    },
+    {
+      id: "cmt_seed_03",
+      articleId: "s04",
+      memberId: "m_7188",
+      memberName: "Aiko Sato",
+      text: "We've kept up the after-dinner walk for three weeks now. Ten minutes is enough.",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
+    },
+  ]);
+
+  // Seed a handful of reactions across two stories so the buttons show
+  // live counts on first boot (issue #90). Different kinds across the
+  // members exercise the per-kind rollup; the rest of the library
+  // exercises the zero-count empty state.
+  const reactionStamp = (offsetMinutes: number): string =>
+    new Date(Date.now() - offsetMinutes * 60 * 1000).toISOString();
+  await db.reactions.bulkAdd([
+    {
+      memberId: "m_5102",
+      articleId: "s01",
+      kind: "grew",
+      createdAt: reactionStamp(120),
+    },
+    {
+      memberId: "m_6033",
+      articleId: "s01",
+      kind: "loved",
+      createdAt: reactionStamp(60),
+    },
+    {
+      memberId: "m_7188",
+      articleId: "s01",
+      kind: "learned",
+      createdAt: reactionStamp(30),
+    },
+    {
+      memberId: "m_5102",
+      articleId: "s04",
+      kind: "loved",
+      createdAt: reactionStamp(20),
+    },
+    {
+      memberId: "m_6033",
+      articleId: "s04",
+      kind: "grew",
+      createdAt: reactionStamp(10),
+    },
+  ]);
 
   localStorage.setItem(SEED_KEY, "1");
 }

@@ -3,8 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
 import { ArticleBody } from "@/_components/article-body";
+import { ArticleComments } from "@/_components/article-comments";
 import { CoverImage } from "@/_components/cover-image";
 import { IconExternal } from "@/_components/glyphs";
+import { StoryReactions } from "@/_components/story-reactions";
 import type { Article, ArticleContributor } from "@/lib/db";
 
 interface ReadNextResponse {
@@ -311,6 +313,7 @@ function DetailReaderBody({ article }: { article: Article }) {
         {/* Body */}
         <div className="font-display text-[18px] text-ink-soft leading-[1.7] max-[1100px]:mx-auto max-[1100px]:max-w-[720px]">
           <ArticleBody bodyJson={article.bodyJson ?? ""} />
+          <StoryReactions articleId={article.id} />
         </div>
 
         {/* Right sidebar */}
@@ -329,6 +332,14 @@ function DetailReaderBody({ article }: { article: Article }) {
           </div>
           <MoreFromReaders excludeId={article.id} />
         </div>
+      </section>
+
+      <section className="shell grid grid-cols-[1fr_720px_1fr] items-start gap-10 max-[1100px]:grid-cols-1">
+        <div className="max-[1100px]:hidden" />
+        <div className="max-[1100px]:mx-auto max-[1100px]:max-w-[720px]">
+          <ArticleComments articleId={article.id} />
+        </div>
+        <div className="max-[1100px]:hidden" />
       </section>
 
       <div className="h-20" />

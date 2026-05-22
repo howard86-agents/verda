@@ -2,11 +2,13 @@ import { HttpResponse, http } from "msw";
 import { adjustPoints, currentBalance, softDeleteMember } from "@/lib/audit";
 import type { CmsAction, CmsRole } from "@/lib/cms-auth";
 import { can } from "@/lib/cms-auth";
+import { listComments, postComment } from "@/lib/comments";
 import {
   db,
   GROWTH_CONFIG_DEFAULT_ID,
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
 } from "@/lib/db";
+import { getReactionState, toggleReaction } from "@/lib/reactions";
 import {
   buildRedemption,
   checkEligibility,
@@ -337,11 +339,30 @@ export const handlers = [
     }
     const body = (await request.json()) as Record<string, unknown>;
     const id = `a_${Date.now().toString(36)}`;
+    const series = body.series as
+      | { name?: unknown; ordinal?: unknown }
+      | undefined;
     const article = {
       id,
       slug: (body.slug as string) || id,
       kind: (body.kind as string) || "brand",
       cat: (body.cat as string) || "",
+      section:
+        typeof body.section === "string" && body.section
+          ? (body.section as string)
+          : undefined,
+      series:
+        series &&
+        typeof series.name === "string" &&
+        series.name &&
+        typeof series.ordinal === "number" &&
+        series.ordinal > 0
+          ? { name: series.name, ordinal: series.ordinal }
+          : undefined,
+      submittedBy:
+        typeof body.submittedBy === "string" && body.submittedBy
+          ? (body.submittedBy as string)
+          : undefined,
       tag: (body.tag as string) || "",
       title: (body.title as string) || "Untitled",
       jp: (body.jp as string) || "",
@@ -739,6 +760,96 @@ export const handlers = [
 
     return HttpResponse.json({ ok: true });
   }),
+
+  // Story comments (issue #89). Reads are public; writes require a
+  // signed-in member id in the body. Newest-first ordering and
+  // soft-removal filtering live in the helper so the same shape is
+  // exercised by tests.
+  http.get("/api/articles/:articleId/comments", async ({ params }) => {
+    const articleId = params.articleId as string;
+    const comments = await listComments(articleId);
+    return HttpResponse.json({ items: comments });
+  }),
+
+  http.post(
+    "/api/articles/:articleId/comments",
+    async ({ request, params }) => {
+      const articleId = params.articleId as string;
+      const body = (await request.json()) as {
+        memberId?: string;
+        memberName?: string;
+        text?: string;
+      };
+      if (!body.memberId) {
+        return HttpResponse.json(
+          { error: "Sign in to post a comment" },
+          { status: 401 }
+        );
+      }
+      if (!body.text?.trim()) {
+        return HttpResponse.json(
+          { error: "Comment text cannot be empty" },
+          { status: 400 }
+        );
+      }
+      const comment = await postComment({
+        articleId,
+        memberId: body.memberId,
+        memberName: body.memberName ?? "",
+        text: body.text,
+      });
+      return HttpResponse.json(comment, { status: 201 });
+    }
+  ),
+
+  // Story reactions (issue #90). Reads carry an optional `memberId`
+  // query param so logged-out readers still see counts, and signed-in
+  // readers see their own current state. Toggles require a `memberId`
+  // in the body and use the same compound-unique storage layer to
+  // ensure a member can hold at most one of each kind per article.
+  http.get(
+    "/api/articles/:articleId/reactions",
+    async ({ params, request }) => {
+      const articleId = params.articleId as string;
+      const url = new URL(request.url);
+      const memberId = url.searchParams.get("memberId");
+      const state = await getReactionState({ articleId, memberId });
+      return HttpResponse.json(state);
+    }
+  ),
+
+  http.post(
+    "/api/articles/:articleId/reactions",
+    async ({ params, request }) => {
+      const articleId = params.articleId as string;
+      const body = (await request.json()) as {
+        kind?: string;
+        memberId?: string;
+      };
+      if (!body.memberId) {
+        return HttpResponse.json(
+          { error: "Sign in to react" },
+          { status: 401 }
+        );
+      }
+      if (
+        body.kind !== "grew" &&
+        body.kind !== "learned" &&
+        body.kind !== "loved"
+      ) {
+        return HttpResponse.json(
+          { error: "Unknown reaction kind" },
+          { status: 400 }
+        );
+      }
+      const result = await toggleReaction({
+        articleId,
+        memberId: body.memberId,
+        kind: body.kind,
+      });
+      return HttpResponse.json(result);
+    }
+  ),
 
   // Taxonomy: Categories
   http.get("/api/cms/categories", async () => {
