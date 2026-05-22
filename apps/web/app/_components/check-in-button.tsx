@@ -54,6 +54,7 @@ export function CheckInButton() {
         qc.invalidateQueries({ queryKey: ["growth-items"] });
         qc.invalidateQueries({ queryKey: ["ledger"] });
         qc.invalidateQueries({ queryKey: ["streak"] });
+        qc.invalidateQueries({ queryKey: ["badge-shelf"] });
       }
     } finally {
       setLoading(false);

@@ -349,3 +349,61 @@ export const MEMBER = {
   saved: 3,
   redeemed: 0,
 };
+
+/**
+ * Badge catalog (issue #93).
+ *
+ * Each badge has a stable id, a display name, a JP label, an icon glyph,
+ * and a `criteria` description for the locked-state UI. The runtime
+ * predicate that decides whether a badge is earned lives in
+ * `apps/web/app/lib/badges.ts` so the catalog stays free of Dexie
+ * imports and can be exported from this data package.
+ */
+export type BadgeId = "first_read" | "reader_10" | "reader_25" | "first_bloom";
+
+export interface Badge {
+  /** Short marketing-style criteria copy for the locked card. */
+  criteria: string;
+  /** Editorial description shown on the earned card. */
+  description: string;
+  /** Single-glyph icon. Themed to match the site's plant/leaf voice. */
+  icon: string;
+  id: BadgeId;
+  jp: string;
+  name: string;
+}
+
+export const BADGE_CATALOG: Badge[] = [
+  {
+    id: "first_read",
+    name: "First read",
+    jp: "初読",
+    icon: "📖",
+    description: "Finished your first Verda story.",
+    criteria: "Finish one story",
+  },
+  {
+    id: "reader_10",
+    name: "Steady reader",
+    jp: "読み手",
+    icon: "🌿",
+    description: "Ten stories read — you've found a rhythm.",
+    criteria: "Finish 10 stories",
+  },
+  {
+    id: "reader_25",
+    name: "Devoted reader",
+    jp: "愛読者",
+    icon: "🌳",
+    description: "Twenty-five stories read — quiet, consistent practice.",
+    criteria: "Finish 25 stories",
+  },
+  {
+    id: "first_bloom",
+    name: "First bloom",
+    jp: "初開花",
+    icon: "🌸",
+    description: "A seedling reached the Bloom level for the first time.",
+    criteria: "Reach Bloom (Lv 03) on any plant",
+  },
+];

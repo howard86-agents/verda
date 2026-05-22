@@ -1,5 +1,6 @@
 import { HttpResponse, http } from "msw";
 import { adjustPoints, currentBalance, softDeleteMember } from "@/lib/audit";
+import { evaluateBadges } from "@/lib/badges";
 import type { CmsAction, CmsRole } from "@/lib/cms-auth";
 import { can } from "@/lib/cms-auth";
 import { listComments, postComment } from "@/lib/comments";
@@ -159,12 +160,18 @@ async function handleCheckIn(memberId: string) {
   // multiple read_completes land in the same day too.
   const streakResult = await applyStreakBonus(memberId);
 
+  // Badge evaluation (issue #93) — runs after the growth allocation +
+  // streak bonus so a level-up triggered by either can light up
+  // first_bloom in the same response.
+  const newBadges = await evaluateBadges(memberId);
+
   return HttpResponse.json({
     ok: true,
     points: pts + streakResult.points,
     balance: streakResult.balance > 0 ? streakResult.balance : newBalance,
     streak: streakResult.streak,
     streakPoints: streakResult.points,
+    newBadges: newBadges.map((b) => b.badgeId),
   });
 }
 
@@ -743,6 +750,11 @@ export const handlers = [
 
       const reward = await awardPoints(memberId, "read_complete", articleId);
       const streakResult = await applyStreakBonus(memberId);
+      // Evaluate badges after the reward, growth allocation, and
+      // streak bonus have landed so reading milestones and first-bloom
+      // can trigger off the same write (issue #93). Awarded ids are
+      // returned so the client can show a celebratory cue if it wants.
+      const newBadges = await evaluateBadges(memberId);
       return HttpResponse.json({
         ok: true,
         ...reward,
@@ -751,6 +763,7 @@ export const handlers = [
           streakResult.balance > 0 ? streakResult.balance : reward.balance,
         streak: streakResult.streak,
         streakPoints: streakResult.points,
+        newBadges: newBadges.map((b) => b.badgeId),
       });
     }
 
