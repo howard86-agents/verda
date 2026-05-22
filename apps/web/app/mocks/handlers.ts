@@ -807,6 +807,92 @@ export const handlers = [
     }
   }),
 
+  // CMS submission approval queue (issue #102). Listing returns
+  // pending reader-contributed articles for the moderation desk;
+  // approve flips the row to published (status===published is the
+  // sentinel the public Readers listing already filters on), reject
+  // sets a 'rejected' status that stays out of the public listing
+  // too. Both mutations are role-guarded by the existing `publish`
+  // policy so only publishers + admins can act.
+  http.get("/api/cms/submissions", async () => {
+    const pending = await db.articles
+      .where("kind")
+      .equals("submission")
+      .filter((a) => a.status === "pending")
+      .toArray();
+    pending.sort((a, b) => b.date.localeCompare(a.date));
+    // Enrich with the submitter's display name so the list doesn't
+    // need a follow-up join.
+    const ids = [
+      ...new Set(
+        pending.map((a) => a.submittedBy).filter((id): id is string => !!id)
+      ),
+    ];
+    const members = ids.length
+      ? await db.members.where("id").anyOf(ids).toArray()
+      : [];
+    const memberById = new Map(members.map((m) => [m.id, m]));
+    return HttpResponse.json({
+      items: pending.map((a) => ({
+        id: a.id,
+        title: a.title,
+        slug: a.slug,
+        submittedAt: a.date,
+        submittedBy: a.submittedBy ?? null,
+        submitterName: a.submittedBy
+          ? (memberById.get(a.submittedBy)?.name ?? a.submittedBy)
+          : "Anonymous",
+        kind: a.kind,
+      })),
+      total: pending.length,
+    });
+  }),
+
+  http.post("/api/cms/submissions/:id/approve", async ({ request, params }) => {
+    const denied = guardRole(request, "publish");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    const existing = await db.articles.get(id);
+    if (!existing) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (existing.kind !== "submission") {
+      return HttpResponse.json(
+        { error: "Article is not a reader submission" },
+        { status: 400 }
+      );
+    }
+    await db.articles.update(id, {
+      status: "published",
+      publishedAt: new Date().toISOString(),
+    });
+    const updated = await db.articles.get(id);
+    return HttpResponse.json({ ok: true, article: updated });
+  }),
+
+  http.post("/api/cms/submissions/:id/reject", async ({ request, params }) => {
+    const denied = guardRole(request, "publish");
+    if (denied) {
+      return denied;
+    }
+    const id = params.id as string;
+    const existing = await db.articles.get(id);
+    if (!existing) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (existing.kind !== "submission") {
+      return HttpResponse.json(
+        { error: "Article is not a reader submission" },
+        { status: 400 }
+      );
+    }
+    await db.articles.update(id, { status: "rejected" });
+    const updated = await db.articles.get(id);
+    return HttpResponse.json({ ok: true, article: updated });
+  }),
+
   http.post("/api/events", async ({ request }) => {
     const body = (await request.json()) as {
       action: string;
