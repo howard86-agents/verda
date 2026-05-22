@@ -1,5 +1,6 @@
 import { type Prisma, prisma } from "@verda/database";
 import { NextResponse } from "next/server";
+import { publicVisibilityWhere } from "../_lib/visibility";
 import { type StoriesListResponse, serializeArticle } from "./serialize";
 
 // Public stories listing — `GET /api/stories` (issue #126).
@@ -43,7 +44,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const where: Prisma.ArticleWhereInput = {
     kind,
-    status: "published",
+    ...publicVisibilityWhere(),
   };
   if (cat && cat !== "All") {
     where.cat = cat;
