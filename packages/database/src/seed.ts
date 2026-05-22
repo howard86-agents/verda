@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { MEMBER, SECTIONS, STORIES } from "@verda/data";
+import { GROWTH_LEVELS, MEMBER, SECTIONS, STORIES } from "@verda/data";
 import type { $Enums, Prisma } from "../generated/client";
 import { prisma } from "./client";
 
@@ -213,13 +213,85 @@ async function seedStaff(): Promise<number> {
   return prisma.user.count({ where: { role: { not: "reader" } } });
 }
 
+async function seedGamificationRules(): Promise<void> {
+  // Growth rules (4 levels)
+  for (const g of GROWTH_LEVELS) {
+    await prisma.growthRule.upsert({
+      where: { level: g.n },
+      update: { name: g.name, jp: g.jp, threshold: g.threshold },
+      create: { level: g.n, name: g.name, jp: g.jp, threshold: g.threshold },
+    });
+  }
+
+  // Growth config (cap = 3)
+  await prisma.growthConfig.upsert({
+    where: { id: "default" },
+    update: { maxItemsPerMember: 3 },
+    create: { id: "default", maxItemsPerMember: 3 },
+  });
+
+  // Reward rules (7 total: 4 core + 3 community)
+  const rules = [
+    {
+      id: "rr_read",
+      action: "read_complete",
+      points: 10,
+      limitType: "per-article",
+    },
+    {
+      id: "rr_checkin",
+      action: "daily_check_in",
+      points: 5,
+      limitType: "per-day",
+    },
+    {
+      id: "rr_collect",
+      action: "collect",
+      points: 2,
+      limitType: "per-article",
+    },
+    {
+      id: "rr_streak_bonus",
+      action: "streak_bonus",
+      points: 5,
+      limitType: "per-day",
+    },
+    {
+      id: "rr_submission_approved",
+      action: "submission_approved",
+      points: 20,
+      limitType: "per-article",
+    },
+    {
+      id: "rr_comment_post",
+      action: "comment_post",
+      points: 3,
+      limitType: "per-article",
+    },
+    {
+      id: "rr_reaction_react",
+      action: "reaction_react",
+      points: 1,
+      limitType: "per-article",
+    },
+  ];
+  for (const r of rules) {
+    await prisma.rewardRule.upsert({
+      where: { id: r.id },
+      update: { points: r.points, limitType: r.limitType, enabled: true },
+      create: { ...r, enabled: true },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   const sectionCount = await seedSections();
   const articleCount = await seedArticles();
   const readerCount = await seedReaders();
   const staffCount = await seedStaff();
+  await seedGamificationRules();
   console.log(
-    `[seed] sections=${sectionCount} articles=${articleCount} readers=${readerCount} staff=${staffCount}`
+    `[seed] sections=${sectionCount} articles=${articleCount} readers=${readerCount} staff=${staffCount} gamification=seeded`
   );
 }
 
