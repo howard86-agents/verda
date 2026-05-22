@@ -15,6 +15,7 @@ import {
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
 } from "@/lib/db";
 import { getReactionState, toggleReaction } from "@/lib/reactions";
+import { composePublicReaderProfile } from "@/lib/reader-profile";
 import { createSubmission } from "@/lib/reader-submissions";
 import {
   buildRedemption,
@@ -662,6 +663,36 @@ export const handlers = [
       return HttpResponse.json({ error: "Not found" }, { status: 404 });
     }
     return HttpResponse.json(article);
+  }),
+
+  // Public reader profile (issue #103) — composes the member, their
+  // active growth item summary, and their approved submissions into a
+  // narrow, privacy-filtered payload. Returns 404 for unknown or
+  // soft-deleted members. Email and the private nutrient ledger are
+  // never part of this payload.
+  http.get("/api/readers/u/:id", async ({ params }) => {
+    const id = params.id as string;
+    const member = await db.members.get(id);
+    const articles = await db.articles
+      .where("submittedBy")
+      .equals(id)
+      .toArray();
+    const growthItems = await db.growthItems
+      .where("memberId")
+      .equals(id)
+      .toArray();
+    const growthRules = await db.growthRules.toArray();
+
+    const profile = composePublicReaderProfile({
+      member,
+      articles,
+      growthItems,
+      growthRules,
+    });
+    if (!profile) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return HttpResponse.json(profile);
   }),
 
   // Full-text command-palette search (issue #99). Scans every
