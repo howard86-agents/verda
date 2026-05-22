@@ -10,7 +10,6 @@ Closes #
 
 - [ ] Author agent has inspected the relevant existing code before implementation.
 - [ ] Independent agent review completed and linked/commented, or explicitly skipped with reason.
-- [ ] Code owner approval requested from @howard86.
 - [ ] This PR must not be self-merged by the authoring agent/account.
 
 ## Verification

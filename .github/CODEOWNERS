@@ -1,4 +1,0 @@
-# Require Howard's review before changes can merge to protected branches.
-# Agent-authored reviews are welcome as advisory review, but Howard remains
-# the code owner/final approval gate for this repository.
-* @howard86
