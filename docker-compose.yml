@@ -1,19 +1,38 @@
-version: "3"
-
-volumes:
-  database:
-    driver: local
-
+# Local Postgres for the verda backend (issue #126).
+#
+# Runs a single Postgres 16 instance on :5432 that the Next.js app and
+# Prisma migrations connect to via the env shape in `.env.example`:
+#
+#   DATABASE_URL — pooled URL used by the app at runtime
+#   DIRECT_URL   — direct URL used by `prisma migrate` / `db push`
+#
+# In production this maps onto Supabase Supavisor's transaction pooler
+# (DATABASE_URL → :6543, DIRECT_URL → :5432). Locally both URLs point at
+# the same instance; the app code is written against the two-URL shape
+# so swapping in real Supavisor is a config-only change.
+#
+# Usage:
+#   docker compose up -d        # start in background
+#   docker compose down         # stop, keep data
+#   docker compose down -v      # stop, drop volume
 services:
   db:
-    platform: linux/amd64
-    image: postgres:15 # Use a specific version of Postgres
-    restart: always
+    image: postgres:15
+    restart: unless-stopped
     environment:
-      - POSTGRES_USER=sebi
-      - POSTGRES_PASSWORD=sebi_test_4444
-      - POSTGRES_DB=turborepo
+      POSTGRES_USER: verda
+      POSTGRES_PASSWORD: verda_dev
+      POSTGRES_DB: verda
     ports:
-      - '5432:5432' # Expose the Postgres port to your local machine
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - verda_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U verda -d verda"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  verda_pg_data:
+    driver: local
