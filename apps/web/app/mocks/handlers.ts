@@ -287,6 +287,7 @@ export const handlers = [
     const url = new URL(request.url);
     const kind = url.searchParams.get("kind") ?? "brand";
     const cat = url.searchParams.get("cat");
+    const section = url.searchParams.get("section");
     const tag = url.searchParams.get("tag");
     const sort = url.searchParams.get("sort") ?? "latest";
     const page = Number(url.searchParams.get("page") ?? "1");
@@ -299,6 +300,9 @@ export const handlers = [
 
     if (cat && cat !== "All") {
       articles = articles.filter((a) => a.cat === cat);
+    }
+    if (section) {
+      articles = articles.filter((a) => a.section === section);
     }
     if (tag) {
       articles = articles.filter((a) => a.tag === tag);

@@ -23,6 +23,13 @@ const NAV = [
     match: (p: string) => p.startsWith("/stories"),
   },
   {
+    id: "topics",
+    en: "Topics",
+    jp: "章",
+    href: "/topics",
+    match: (p: string) => p.startsWith("/topics"),
+  },
+  {
     id: "readers",
     en: "Readers",
     jp: "読者",
