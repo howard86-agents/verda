@@ -3,7 +3,7 @@
   "globalEnv": ["DATABASE_URL", "DIRECT_URL", "NEXT_PUBLIC_API_MODE"],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "^generate"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },

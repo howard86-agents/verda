@@ -12,6 +12,7 @@
     "dev": "tsup src/* --watch",
     "format": "prisma format",
     "generate": "prisma generate",
+    "postinstall": "prisma generate",
     "prebuild": "npm run generate",
     "predev": "npm run generate",
     "studio": "prisma studio",
