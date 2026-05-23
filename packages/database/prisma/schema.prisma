@@ -72,6 +72,8 @@ model Article {
   // promotes this to a relation if needed.
   section      String?
 
+  versions ArticleVersion[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -81,6 +83,23 @@ model Article {
   @@index([submittedBy])
   @@index([status])
   @@map("articles")
+}
+
+/// CMS article version snapshot (issue #137). One row per `Save
+/// version` action on a draft. The full serialized article body
+/// lives on the `snapshot` JSON column so a future restore can
+/// reconstruct the row without tracking per-field history. Indexed
+/// on `(articleId, timestamp)` for the per-article timeline view.
+model ArticleVersion {
+  id        String   @id @default(cuid())
+  articleId String
+  timestamp DateTime @default(now())
+  snapshot  Json
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, timestamp])
+  @@map("article_versions")
 }
 
 /// Identity role exposed as a JWT claim by the Auth.js callbacks

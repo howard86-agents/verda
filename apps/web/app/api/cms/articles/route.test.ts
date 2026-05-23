@@ -134,6 +134,102 @@ describe.skipIf(skip)("CMS article lifecycle (issue #129)", () => {
     expect(body.status).toBe("unpublished");
   });
 
+  test("POST and GET versions — editor snapshots current article fields", async () => {
+    const { POST, GET } = await import("./[id]/versions/route");
+    await prisma.article.update({
+      where: { id: testArticleId },
+      data: { title: "Versioned Title", tag: "snapshot" },
+    });
+
+    const saveRes = await POST(
+      new Request(
+        `http://localhost/api/cms/articles/${testArticleId}/versions`,
+        {
+          method: "POST",
+          headers: cmsHeaders("editor"),
+        }
+      ),
+      { params: Promise.resolve({ id: testArticleId }) }
+    );
+    expect(saveRes.status).toBe(201);
+    const saved = (await saveRes.json()) as {
+      articleId: string;
+      snapshot: { title: string; tag: string };
+      timestamp: string;
+    };
+    expect(saved.articleId).toBe(testArticleId);
+    expect(saved.snapshot.title).toBe("Versioned Title");
+    expect(saved.snapshot.tag).toBe("snapshot");
+    expect(Date.parse(saved.timestamp)).not.toBeNaN();
+
+    const listRes = await GET(
+      new Request(
+        `http://localhost/api/cms/articles/${testArticleId}/versions`,
+        {
+          method: "GET",
+          headers: cmsHeaders("editor"),
+        }
+      ),
+      { params: Promise.resolve({ id: testArticleId }) }
+    );
+    expect(listRes.status).toBe(200);
+    const list = (await listRes.json()) as Array<{
+      articleId: string;
+      snapshot: { title: string };
+    }>;
+    expect(list).toHaveLength(1);
+    expect(list[0]?.articleId).toBe(testArticleId);
+    expect(list[0]?.snapshot.title).toBe("Versioned Title");
+  });
+
+  test("POST batch — mixed permissions apply allowed ops and report denied ops", async () => {
+    const { POST } = await import("./batch/route");
+    const batchArticle = await prisma.article.create({
+      data: {
+        slug: `batch-${Date.now().toString(36)}`,
+        title: "Batch Article",
+        status: "draft",
+      },
+    });
+
+    try {
+      const res = await POST(
+        new Request("http://localhost/api/cms/articles/batch", {
+          method: "POST",
+          headers: cmsHeaders("editor"),
+          body: JSON.stringify({
+            operations: [
+              {
+                action: "set_tags",
+                articleIds: [batchArticle.id],
+                tags: "allowed-tag",
+              },
+              { action: "publish", articleIds: [batchArticle.id] },
+            ],
+          }),
+        })
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        ok: boolean;
+        results: Array<{ action: string; status: number; count?: number }>;
+      };
+      expect(body.ok).toBe(false);
+      expect(body.results).toEqual([
+        { action: "set_tags", status: 200, count: 1 },
+        { action: "publish", status: 403 },
+      ]);
+
+      const updated = await prisma.article.findUniqueOrThrow({
+        where: { id: batchArticle.id },
+      });
+      expect(updated.tag).toBe("allowed-tag");
+      expect(updated.status).toBe("draft");
+    } finally {
+      await prisma.article.delete({ where: { id: batchArticle.id } });
+    }
+  });
+
   test("POST schedule — admin succeeds", async () => {
     const { POST } = await import("./[id]/schedule/route");
     const future = new Date(Date.now() + 86_400_000).toISOString();

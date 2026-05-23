@@ -8,6 +8,7 @@ import { PrismaClient } from "../generated/client";
 export type {
   $Enums,
   Article,
+  ArticleVersion,
   Prisma,
   Section,
   User,
