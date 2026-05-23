@@ -4,6 +4,8 @@ import { STORY_BODIES } from "./story-bodies";
 
 const GRADIENT_RE = /^linear-gradient/;
 const SECTION_FILL_ID_RE = /^s(0[7-9]|1\d|20)$/;
+const FLAGSHIP_IDS = ["s21", "s22", "s23", "s24"] as const;
+const FLAGSHIP_WORD_MIN = 950;
 
 /**
  * Section-fill regression coverage (issue #96).
@@ -75,6 +77,61 @@ describe("STORIES multi-part series grouping (issue #96)", () => {
     // Movement to balance section depth without disturbing the existing
     // grouping.
     expect(movementSeries.size).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("STORIES flagship long reads (issue #95)", () => {
+  function wordCount(body: (typeof STORY_BODIES)[string]): number {
+    const words: string[] = [];
+    const visit = (node: unknown) => {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      if ("text" in node && typeof node.text === "string") {
+        words.push(...(node.text.match(/[A-Za-z0-9’']+/g) ?? []));
+      }
+      if ("content" in node && Array.isArray(node.content)) {
+        for (const child of node.content) {
+          visit(child);
+        }
+      }
+    };
+
+    for (const node of body.content) {
+      visit(node);
+    }
+    return words.length;
+  }
+
+  test("adds four flagship long reads with rich bodyJson", () => {
+    for (const id of FLAGSHIP_IDS) {
+      const story = STORIES.find((s) => s.id === id);
+      expect(story).toBeDefined();
+      expect(story?.imagePrompt.length).toBeGreaterThan(0);
+      expect(story?.imageSeed).toBeGreaterThan(0);
+
+      const body = STORY_BODIES[id];
+      expect(body).toBeDefined();
+      expect(
+        body.content.filter((node) => node.type === "heading").length
+      ).toBeGreaterThanOrEqual(2);
+      expect(
+        body.content.filter((node) => node.type === "blockquote").length
+      ).toBeGreaterThanOrEqual(1);
+      expect(body.content.filter((node) => node.type === "image").length).toBe(
+        2
+      );
+      expect(wordCount(body)).toBeGreaterThanOrEqual(FLAGSHIP_WORD_MIN);
+    }
+  });
+
+  test("groups one flagship as a 3-part series", () => {
+    const houseSeries = STORIES.filter(
+      (s) => s.series?.name === "House with seasons"
+    ).sort((a, b) => (a.series?.ordinal ?? 0) - (b.series?.ordinal ?? 0));
+
+    expect(houseSeries.map((s) => s.id)).toEqual(["s21", "s22", "s23"]);
+    expect(houseSeries.map((s) => s.series?.ordinal)).toEqual([1, 2, 3]);
   });
 });
 
