@@ -21,7 +21,7 @@ export async function GET(): Promise<Response> {
   }
 
   const comments = await prisma.comment.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
   });
 
   return NextResponse.json({ comments });
