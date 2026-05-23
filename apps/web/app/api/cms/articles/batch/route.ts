@@ -1,7 +1,7 @@
 import { type Prisma, prisma } from "@verda/database";
 import { NextResponse } from "next/server";
 import type { CmsAction } from "../../../../lib/cms-auth";
-import { guardRole } from "../../../_lib/guard-role";
+import { guardRole } from "../../../../_lib/guard-role";
 
 // CMS article batch operations (issue #137).
 export const runtime = "nodejs";
