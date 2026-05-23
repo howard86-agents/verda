@@ -105,7 +105,7 @@ describe.skipIf(skip)("Comments API (issue #131)", () => {
 
     const comments = await prisma.comment.findMany({
       where: { articleId: TEST_ARTICLE, removedAt: null },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
 
     expect(comments[0].id).toBe(c2.id);
