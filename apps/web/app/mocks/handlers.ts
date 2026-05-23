@@ -393,8 +393,97 @@ export const migratedSearchHandlers = [
   }),
 ];
 
+// Public reader profile (issue #139). Same migration pattern as
+// `migratedStoriesHandlers` and `migratedSearchHandlers`:
+// `mocks/browser.ts` drops these handlers when `NEXT_PUBLIC_API_MODE=real`
+// so the request bypasses MSW and hits the Postgres-backed Route
+// Handler at `apps/web/app/api/readers/u/[id]/route.ts`. Default
+// (`mock`) keeps the legacy Dexie-backed handler that composes the
+// public profile from the in-browser store.
+export const migratedReaderProfileHandlers = [
+  http.get("/api/readers/u/:id", async ({ params }) => {
+    const id = params.id as string;
+    const member = await db.members.get(id);
+    const articles = await db.articles
+      .where("submittedBy")
+      .equals(id)
+      .toArray();
+    const growthItems = await db.growthItems
+      .where("memberId")
+      .equals(id)
+      .toArray();
+    const growthRules = await db.growthRules.toArray();
+    const badges = await db.memberBadges.where("memberId").equals(id).toArray();
+
+    const profile = composePublicReaderProfile({
+      member,
+      articles,
+      growthItems,
+      growthRules,
+      badges,
+    });
+    if (!profile) {
+      return HttpResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return HttpResponse.json(profile);
+  }),
+];
+
+// The Dexie-backed handlers for `/api/growth` and `/api/redemptions`
+// are factored out so `mocks/browser.ts` can opt them out when
+// `NEXT_PUBLIC_API_MODE=real` (issue #132). With the migrated handlers
+// dropped, MSW falls through and the real Postgres-backed Route
+// Handlers under `app/api/growth` and `app/api/redemptions` serve the
+// request instead.
+//
+// `/api/growth` did not exist in the legacy Dexie surface — the grow
+// page used to read directly from Dexie via five React Query hooks.
+// The migration unifies those reads behind a single GET so the page
+// can be flipped to a real backend without a refactor every time.
+export const migratedGrowthHandlers = [
+  http.get("/api/growth", async ({ request }) => {
+    const url = new URL(request.url);
+    const memberId =
+      url.searchParams.get("memberId") ?? url.searchParams.get("userId");
+    if (!memberId) {
+      return HttpResponse.json({ error: "memberId required" }, { status: 400 });
+    }
+
+    const [items, rules, config, ledger, behaviorLogs] = await Promise.all([
+      db.growthItems.where("memberId").equals(memberId).toArray(),
+      db.growthRules.orderBy("level").toArray(),
+      db.growthConfig.get(GROWTH_CONFIG_DEFAULT_ID),
+      db.pointLedger
+        .where("memberId")
+        .equals(memberId)
+        .reverse()
+        .limit(5)
+        .toArray(),
+      db.behaviorLogs.where("memberId").equals(memberId).toArray(),
+    ]);
+
+    return HttpResponse.json({
+      ok: true,
+      items: [...items].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0)),
+      rules,
+      cap: config?.maxItemsPerMember ?? GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
+      ledger,
+      streak: computeStreak(behaviorLogs),
+    });
+  }),
+
+  http.post("/api/redemptions", async ({ request }) => {
+    const body = (await request.json()) as {
+      growthItemId?: number;
+      memberId?: string;
+    };
+    return handleRedemption(body);
+  }),
+];
+
 export const handlers = [
   ...migratedStoriesHandlers,
+  ...migratedGrowthHandlers,
 
   http.get("/api/cms/articles", async () => {
     await promoteDueScheduled();
@@ -712,38 +801,7 @@ export const handlers = [
     }
   }),
 
-  // Public reader profile (issue #103) — composes the member, their
-  // active growth item summary, and their approved submissions into a
-  // narrow, privacy-filtered payload. Returns 404 for unknown or
-  // soft-deleted members. Email and the private nutrient ledger are
-  // never part of this payload. Issue #105 adds the earned-badge
-  // shelf alongside.
-  http.get("/api/readers/u/:id", async ({ params }) => {
-    const id = params.id as string;
-    const member = await db.members.get(id);
-    const articles = await db.articles
-      .where("submittedBy")
-      .equals(id)
-      .toArray();
-    const growthItems = await db.growthItems
-      .where("memberId")
-      .equals(id)
-      .toArray();
-    const growthRules = await db.growthRules.toArray();
-    const badges = await db.memberBadges.where("memberId").equals(id).toArray();
-
-    const profile = composePublicReaderProfile({
-      member,
-      articles,
-      growthItems,
-      growthRules,
-      badges,
-    });
-    if (!profile) {
-      return HttpResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    return HttpResponse.json(profile);
-  }),
+  ...migratedReaderProfileHandlers,
 
   ...migratedSearchHandlers,
 
@@ -810,14 +868,6 @@ export const handlers = [
     }
 
     return HttpResponse.json({ ok: true });
-  }),
-
-  http.post("/api/redemptions", async ({ request }) => {
-    const body = (await request.json()) as {
-      growthItemId?: number;
-      memberId?: string;
-    };
-    return handleRedemption(body);
   }),
 
   // Public reader-submission endpoint (issue #91). Auth-gated by

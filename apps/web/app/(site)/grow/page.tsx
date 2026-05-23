@@ -11,16 +11,14 @@ import { IconDrop } from "@/_components/glyphs";
 import { Plant } from "@/_components/plant";
 import { useAuth } from "@/lib/auth";
 import {
-  db,
-  GROWTH_CONFIG_DEFAULT_ID,
   GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
   type GrowthItem,
   type GrowthRule,
+  type PointLedger,
   type Redemption,
 } from "@/lib/db";
 import { maxThresholdFor } from "@/lib/growth-allocation";
 import { levelFor } from "@/lib/rewards";
-import { computeStreak } from "@/lib/streak";
 import { track } from "@/lib/track";
 
 const CORNERS = [
@@ -242,6 +240,46 @@ interface ProgressLabels {
   title: string;
 }
 
+interface GrowthApiResponse {
+  cap: number;
+  items: GrowthItem[];
+  ledger: PointLedger[];
+  ok: true;
+  rules: GrowthRule[];
+  streak: number;
+}
+
+async function fetchGrowthState(memberId: string): Promise<GrowthApiResponse> {
+  const res = await fetch(
+    `/api/growth?memberId=${encodeURIComponent(memberId)}`
+  );
+  const data = (await res.json()) as
+    | GrowthApiResponse
+    | { error: string; ok?: false };
+  if (!(res.ok && "ok" in data && data.ok)) {
+    throw new Error(
+      "error" in data ? data.error : "Failed to load growth state"
+    );
+  }
+  return data;
+}
+
+function growthViewState(
+  growthState: GrowthApiResponse | undefined,
+  fallbackRules: GrowthRule[]
+) {
+  return {
+    items: growthState?.items ?? [],
+    ledger: growthState?.ledger ?? [],
+    streak: growthState?.streak ?? 0,
+    growthRules:
+      growthState && growthState.rules.length > 0
+        ? growthState.rules
+        : fallbackRules,
+    cap: growthState?.cap ?? GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
+  };
+}
+
 function activeProgressLabels(
   activeItem: GrowthItem | undefined,
   atCap: boolean,
@@ -365,15 +403,20 @@ export default function Page() {
   const qc = useQueryClient();
   const [rewardToast, setRewardToast] = useState<Redemption | null>(null);
 
-  const { data: items = [] } = useQuery({
-    queryKey: ["growth-items", member?.id],
+  // One round trip behind `/api/growth` returns everything the page
+  // needs (issue #132). Mock mode hits the MSW handler that mirrors
+  // the legacy Dexie reads; real mode bypasses MSW and hits the
+  // Postgres-backed Route Handler.
+  const { data: growthState } = useQuery({
+    queryKey: ["growth", member?.id],
     enabled: !!member,
-    queryFn: async () => {
-      const id = member?.id ?? "";
-      const rows = await db.growthItems.where("memberId").equals(id).toArray();
-      return [...rows].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
-    },
+    queryFn: () => fetchGrowthState(member?.id ?? ""),
   });
+
+  const { items, ledger, streak, growthRules, cap } = growthViewState(
+    growthState,
+    FALLBACK_RULES
+  );
 
   const redeemMutation = useMutation({
     mutationFn: async (target: GrowthItem) => {
@@ -409,7 +452,7 @@ export default function Page() {
         provider: redemption.provider,
       });
       setRewardToast(redemption);
-      qc.invalidateQueries({ queryKey: ["growth-items", item.memberId] });
+      qc.invalidateQueries({ queryKey: ["growth", item.memberId] });
     },
   });
 
@@ -423,54 +466,6 @@ export default function Page() {
     redeemMutation.isPending && redeemMutation.variables
       ? (redeemMutation.variables.id ?? null)
       : null;
-
-  const { data: ledger } = useQuery({
-    queryKey: ["ledger", member?.id],
-    enabled: !!member,
-    queryFn: async () => {
-      const id = member?.id ?? "";
-      return db.pointLedger
-        .where("memberId")
-        .equals(id)
-        .reverse()
-        .limit(5)
-        .toArray();
-    },
-  });
-
-  // Live growth rules from Dexie — admin edits via /cms/growth-rules update
-  // these and the page picks them up on the next render. Falls back to the
-  // static @verda/data data until the table is populated (first paint or
-  // before seedIfEmpty has run).
-  const { data: growthRules = FALLBACK_RULES } = useQuery({
-    queryKey: ["growth-rules"],
-    queryFn: async () => {
-      const rows = await db.growthRules.orderBy("level").toArray();
-      return rows.length > 0 ? rows : FALLBACK_RULES;
-    },
-  });
-
-  const { data: cap = GROWTH_CONFIG_DEFAULT_MAX_ITEMS } = useQuery({
-    queryKey: ["growth-cap"],
-    queryFn: async () => {
-      const cfg = await db.growthConfig.get(GROWTH_CONFIG_DEFAULT_ID);
-      return cfg?.maxItemsPerMember ?? GROWTH_CONFIG_DEFAULT_MAX_ITEMS;
-    },
-  });
-
-  // Consecutive-day streak (issue #92). Driven by check_in /
-  // read_complete entries in the behavior log; refetches whenever the
-  // ledger does so a fresh check-in flips the counter without a manual
-  // invalidate.
-  const { data: streak = 0 } = useQuery({
-    queryKey: ["streak", member?.id],
-    enabled: !!member,
-    queryFn: async () => {
-      const id = member?.id ?? "";
-      const logs = await db.behaviorLogs.where("memberId").equals(id).toArray();
-      return computeStreak(logs);
-    },
-  });
 
   const sortedRules = [...growthRules].sort((a, b) => a.level - b.level);
   const maxThreshold = maxThresholdFor(sortedRules) || 300;
