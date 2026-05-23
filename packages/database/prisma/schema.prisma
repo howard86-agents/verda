@@ -133,6 +133,7 @@ model User {
   behaviorLogs  BehaviorLog[]
   pointLedger   PointLedgerEntry[]
   growthItems   GrowthItem[]
+  redemptions   Redemption[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -289,10 +290,37 @@ model GrowthItem {
   redemptionId String?
   createdAt    DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redemption Redemption?
 
   @@index([userId])
   @@map("growth_items")
+}
+
+/// Grow redemption (issue #132). A completed growth item can be
+/// redeemed exactly once; `growthItemId` is unique so concurrent or
+/// repeated redemption attempts are rejected by Postgres, not only by
+/// app code. The mocked reward provider produces a `VERDA-PLANT-NN`
+/// code keyed off the per-member `growthItem.sequence` so demo flows
+/// stay deterministic.
+model Redemption {
+  id                 String    @id
+  userId             String
+  growthItemId       Int       @unique
+  growthItemSequence Int
+  provider           String    @default("mock")
+  rewardCode         String
+  displayName        String?
+  expiresAt          DateTime?
+  fulfillmentRef     String?
+  metadata           Json?
+  createdAt          DateTime  @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  growthItem GrowthItem @relation(fields: [growthItemId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("redemptions")
 }
 
 /// Reader engagement: saved article collection (issue #131).

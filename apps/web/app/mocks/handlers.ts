@@ -429,8 +429,61 @@ export const migratedReaderProfileHandlers = [
   }),
 ];
 
+// The Dexie-backed handlers for `/api/growth` and `/api/redemptions`
+// are factored out so `mocks/browser.ts` can opt them out when
+// `NEXT_PUBLIC_API_MODE=real` (issue #132). With the migrated handlers
+// dropped, MSW falls through and the real Postgres-backed Route
+// Handlers under `app/api/growth` and `app/api/redemptions` serve the
+// request instead.
+//
+// `/api/growth` did not exist in the legacy Dexie surface — the grow
+// page used to read directly from Dexie via five React Query hooks.
+// The migration unifies those reads behind a single GET so the page
+// can be flipped to a real backend without a refactor every time.
+export const migratedGrowthHandlers = [
+  http.get("/api/growth", async ({ request }) => {
+    const url = new URL(request.url);
+    const memberId =
+      url.searchParams.get("memberId") ?? url.searchParams.get("userId");
+    if (!memberId) {
+      return HttpResponse.json({ error: "memberId required" }, { status: 400 });
+    }
+
+    const [items, rules, config, ledger, behaviorLogs] = await Promise.all([
+      db.growthItems.where("memberId").equals(memberId).toArray(),
+      db.growthRules.orderBy("level").toArray(),
+      db.growthConfig.get(GROWTH_CONFIG_DEFAULT_ID),
+      db.pointLedger
+        .where("memberId")
+        .equals(memberId)
+        .reverse()
+        .limit(5)
+        .toArray(),
+      db.behaviorLogs.where("memberId").equals(memberId).toArray(),
+    ]);
+
+    return HttpResponse.json({
+      ok: true,
+      items: [...items].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0)),
+      rules,
+      cap: config?.maxItemsPerMember ?? GROWTH_CONFIG_DEFAULT_MAX_ITEMS,
+      ledger,
+      streak: computeStreak(behaviorLogs),
+    });
+  }),
+
+  http.post("/api/redemptions", async ({ request }) => {
+    const body = (await request.json()) as {
+      growthItemId?: number;
+      memberId?: string;
+    };
+    return handleRedemption(body);
+  }),
+];
+
 export const handlers = [
   ...migratedStoriesHandlers,
+  ...migratedGrowthHandlers,
 
   http.get("/api/cms/articles", async () => {
     await promoteDueScheduled();
@@ -815,14 +868,6 @@ export const handlers = [
     }
 
     return HttpResponse.json({ ok: true });
-  }),
-
-  http.post("/api/redemptions", async ({ request }) => {
-    const body = (await request.json()) as {
-      growthItemId?: number;
-      memberId?: string;
-    };
-    return handleRedemption(body);
   }),
 
   // Public reader-submission endpoint (issue #91). Auth-gated by
