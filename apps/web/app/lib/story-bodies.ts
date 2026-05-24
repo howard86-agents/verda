@@ -27,8 +27,24 @@ interface TiptapHeading {
   type: "heading";
 }
 
+interface TiptapImage {
+  attrs: { alt: string; src: string; title: string };
+  type: "image";
+}
+
+interface TiptapBlockquote {
+  content: TiptapParagraph[];
+  type: "blockquote";
+}
+
+type StoryBodyNode =
+  | TiptapBlockquote
+  | TiptapHeading
+  | TiptapImage
+  | TiptapParagraph;
+
 export interface StoryBodyDoc {
-  content: (TiptapParagraph | TiptapHeading)[];
+  content: StoryBodyNode[];
   type: "doc";
 }
 
@@ -44,7 +60,22 @@ function h2(text: string): TiptapHeading {
   };
 }
 
-function doc(...nodes: (TiptapParagraph | TiptapHeading)[]): StoryBodyDoc {
+function pullQuote(text: string): TiptapBlockquote {
+  return { type: "blockquote", content: [p(text)] };
+}
+
+function figure(id: string, n: number, title: string): TiptapImage {
+  return {
+    type: "image",
+    attrs: {
+      src: `/img/stories/${id}.webp`,
+      alt: `Figure ${n} — ${title}`,
+      title: `Figure ${n} — ${title}`,
+    },
+  };
+}
+
+function doc(...nodes: StoryBodyNode[]): StoryBodyDoc {
   return { type: "doc", content: nodes };
 }
 
@@ -413,6 +444,256 @@ export const STORY_BODIES: Record<string, StoryBodyDoc> = {
     ),
     p(
       "The third jar is the one that has changed how I shop. I no longer feel the small panic I used to feel when a vegetable was on its second week. The pickle jar is the soft landing. The vegetables get a second life, the meal gets a third dimension, and the fridge — for once — does not produce that quiet, regretful smell of wilted greens. Three jars. One brine. Whatever is about to go soft becomes whatever is about to be eaten."
+    )
+  ),
+  s21: doc(
+    h2("Air first, decisions later"),
+    p(
+      "For years I thought spring cleaning meant shelves, bags, donation boxes, a dramatic before-and-after photograph. Then one April morning I opened every window in the apartment before I had made tea, and the room changed before I touched a single object. The air moved first. Dust lifted from the floorboards. The curtain breathed in and out like something sleeping lightly. I stood there with the kettle unfilled and felt the house begin without me."
+    ),
+    p(
+      "This is the first practice in the house with seasons: open the windows before you improve anything. Not because fresh air solves the drawer, or the inbox, or the chair covered in sweaters, but because the body needs proof that change can arrive gently. A room that has been closed all winter does not need a performance. It needs circulation. It needs ten minutes of being reminded that outside exists."
+    ),
+    figure("s21", 1, "windows opened before the room is sorted"),
+    p(
+      "Figure 1 — The practice begins before the broom: light, air, and the ordinary mess allowed to breathe."
+    ),
+    pullQuote(
+      "A room that has been closed all winter does not need a performance. It needs circulation."
+    ),
+    p(
+      "I learned this from my grandmother, who never announced cleaning days. She opened windows. She tied the curtains back with whatever was near. She set two cups of tea on the sill, one for herself and one for whoever wandered through. Only after the air had moved did she sweep. Only after sweeping did she decide whether anything truly had to leave the house."
+    ),
+    h2("The softer audit"),
+    p(
+      "The order matters. If I start with deciding, I get severe. I decide the stack of magazines is evidence against me. I decide the sweater chair is a moral failure. I decide the pantry is a record of past selves I no longer respect. But if I start with air, I become less interested in judgment. The room is not a defendant. It is a habitat that has held me through a colder season."
+    ),
+    p(
+      "After the windows, I make what I call the softer audit. I walk the room once with no bag in my hand. I do not pick anything up. I name what is working: the chair catches the morning sun; the shelf by the door holds keys reliably; the basket of scarves is chaotic but useful. Only after naming the room's loyalties do I notice what no longer belongs."
+    ),
+    p(
+      "This changes the editing. The stack of magazines becomes three recipes to clip and the rest to recycle. The sweater chair becomes a hook by the door, not proof that I am lazy. The pantry becomes a set of ingredients asking to be cooked this week, not an archive of failed intentions. The house answers better questions when I ask better questions."
+    ),
+    h2("A bilingual note on enough"),
+    p(
+      "My grandmother called this yutori — not exactly spaciousness, not exactly ease, but the margin around a thing that lets it be itself. In English I say enough, which is blunter and useful. Enough space for the air to move. Enough patience to sweep after tea. Enough humility to know that a room can be improved without being transformed."
+    ),
+    figure("s21", 2, "the softer audit on a low table"),
+    p(
+      "Figure 2 — Tea, notebook, and three small decisions: keep, repair, release."
+    ),
+    p(
+      "The bilingual voice of the house matters here because each language catches a different excess. In Japanese I can say komakai tokoro — the tiny places — and immediately see the dust in the track of the window, the receipt folded behind the bowl, the pen cap under the table. In English I can say overall and remember not to spend the whole morning with a cotton swab. Between the two, the cleaning becomes both precise and merciful. The window track gets wiped; the entire personality does not get renovated."
+    ),
+    p(
+      "I also make a small after-list, which is different from the before-list that used to exhaust me. The after-list records what the room asked for once it could breathe: oil the chair, mend the curtain loop, cook the barley before it ages another month. These are not accusations. They are invitations with dates attached. By evening, the list is short enough to trust, and the room is open enough to keep teaching."
+    ),
+
+    p(
+      "What surprises me, each spring, is how much of the work is permission. Permission to keep the old wooden bowl because it still makes oranges look generous. Permission to move the lamp three inches and call that design. Permission to let one shelf remain half empty without filling it with proof that I have taste. The open windows make these permissions audible. They remind me that a home is not a portfolio. It is a climate we make for ordinary days, and climates change through repeated small conditions, not heroic declarations."
+    ),
+
+    p(
+      "Before closing the windows at night, I take one last walk through the room and touch the surfaces that changed: the sill, the drawer pull, the chair back, the clean corner where the magazines were. This is not ceremony so much as calibration. My hand remembers what enough feels like before the week begins filling the room again."
+    ),
+
+    p(
+      "If the house with seasons has a thesis, it is this: begin with the condition, not the correction. Air before sorting. Light before judgment. Tea before the bag marked donate."
+    ),
+
+    p(
+      "I keep the practice intentionally small because smallness is what lets it return. The windows can be opened on a busy morning. The softer audit can happen while the rice cooks. Even the decision to leave one shelf half empty can be made in passing, without converting the day into a project. This is the part I used to miss: a seasonal house is not maintained by rare heroic weekends, but by repeatable forms of attention that fit inside ordinary weather."
+    ),
+
+    p(
+      "By noon the room is usually only modestly better. The windows have been open for hours. Two bags have left. One drawer closes. Nothing dramatic has happened, which is the point. Spring, in a house, is not a makeover. It is a change in circulation. It is the season teaching the room how to inhale again, and teaching me to begin there."
+    )
+  ),
+  s22: doc(
+    h2("A counter arranged for heat"),
+    p(
+      "By July the kitchen stops being a place where ambition is rewarded. The stove heats the room. The oven becomes a threat. Even boiling pasta feels like making the weather worse. This is when I rearrange the counter, not for beauty, but for survival: water where a hand reaches first, fruit visible before the snack drawer, a knife already on the small board, a towel that can become a potholder or a fan."
+    ),
+    p(
+      "The summer counter is a small argument against the idea that good eating must be planned in full sentences. In heat, the meal often begins as a gesture: cut the tomato, salt the melon, rinse the herbs, pour water into the clay pitcher so it sweats coolly for an hour. The counter makes these gestures easy enough to do before I talk myself out of them."
+    ),
+    figure("s22", 1, "the summer counter before dinner"),
+    p(
+      "Figure 1 — Water, fruit, salt, and a clear board: the mise en place of not overheating."
+    ),
+    pullQuote(
+      "In heat, a meal often begins as a gesture: cut the tomato, salt the melon, rinse the herbs."
+    ),
+    p(
+      "I used to think seasonal eating meant farmers market abundance and glossy piles of produce. It can mean that. More often, in our apartment, it means knowing which foods can wait politely at room temperature and which need rescuing by six. Tomatoes stay on the counter. Stone fruit ripens in a shallow bowl. Cucumbers go straight to the refrigerator and return in coins, salted with sesame, when dinner needs something cold and clean."
+    ),
+    h2("The five quiet requirements"),
+    p(
+      "The counter becomes a map of needs: salt, water, acid, crunch, something soft. When all five are present, dinner can be almost embarrassingly simple and still feel cared for. Rice from yesterday, tofu from the fridge, a tomato cut with too much salt, a peach eaten over the sink. The meal does not perform effort. It restores it."
+    ),
+    p(
+      "I keep a small bowl of salt beside the cutting board because in summer salt is a tool for attention. Salt a tomato and it becomes dinner-adjacent. Salt cucumber and ten minutes later it has made its own dressing. Salt watermelon lightly and the sweetness moves forward, like someone stepping into better light. None of this is cooking in the formal sense. It is more like listening."
+    ),
+    p(
+      "Water matters just as much. The pitcher is clay, slightly porous, and it cools by evaporation if I fill it early enough. This is a tiny luxury, and also a practical one: everyone drinks more when water looks like it is waiting for them. I add shiso when we have it, mint when the mint has forgiven me, lemon peel when a lemon has already been cut for something else."
+    ),
+    h2("Dinner without a thesis"),
+    p(
+      "The best hot-weather dinners in our house do not have a thesis. They have parts: cold tofu with grated ginger, rice from yesterday, tomatoes, pickles, fruit, a handful of herbs, maybe an egg. If someone is hungry later, there is toast. I no longer apologize for this. Summer has its own appetite, and it often asks for less structure than I was trained to provide."
+    ),
+    figure("s22", 2, "a no-cook dinner assembled from the counter"),
+    p(
+      "Figure 2 — Tomato, tofu, herbs, and yesterday rice: enough dinner for a room that is already warm."
+    ),
+    p(
+      "There is also the matter of hunger in heat, which arrives strangely. Nobody wants dinner at seven, then everyone wants something at nine. The summer counter accepts this. It keeps components ready without making the cook stand guard. A bowl of salted cucumbers can wait. Rice can wait under a cloth. Tofu can be opened when the first person admits they are hungry. The meal assembles around the household instead of summoning everyone to a fixed hour."
+    ),
+    p(
+      "This is not anti-cooking. It is cooking in a different key. The labor moves earlier and smaller: washing greens before the room gets hot, making tea to chill while breakfast dishes dry, cutting fruit before it collapses into sweetness. By dinner the kitchen feels less like a stage and more like a shaded bench. You sit down, you take what is cool, and the day loosens its grip."
+    ),
+
+    p(
+      "There are evenings when this arrangement feels almost too simple to call care. Then someone comes in from the heat, drinks two glasses of cool water without speaking, and eats a salted tomato with their fingers. That is when I remember the counter is doing hospitality at the speed of weather. It has anticipated thirst, low appetite, impatience, and the odd loneliness of a hot room. It cannot make July gentle, but it can make the first five minutes after coming home feel received."
+    ),
+
+    p(
+      "The counter will become cluttered again by breakfast. A peach pit, a spoon, a glass left half full. I no longer mind. A working summer counter is not pristine. It is responsive. It shows that people came in hot, found water, made something cold, and kept moving gently through the day."
+    ),
+
+    p(
+      "If the house with seasons has a summer rule, it is this: reduce the heat of the room and the heat of the decision at the same time. Let the meal be clear before it is impressive."
+    ),
+
+    p(
+      "A summer counter also teaches restraint in shopping. I buy what can become a meal without becoming a task: tomatoes, cucumbers, tofu, eggs, rice, fruit, herbs if they look sturdy rather than decorative. The question is not what would make the most beautiful table, but what the household will actually reach for when the room is too warm and everyone is slightly wordless. Beauty still arrives, but sideways — in a sweating pitcher, a peach cut over a bowl, basil torn because scissors are too much."
+    ),
+
+    p(
+      "By August the counter looks almost bare because the system has become obvious. The bowl gets refilled. The towel dries on the hook. The knife is washed and returned. The kitchen is not cooler, exactly, but it is kinder. It has stopped asking me to prove care through heat. It lets dinner be a sequence of cool, useful gestures, and that is how we keep eating well until the weather changes."
+    )
+  ),
+  s23: doc(
+    h2("The table that gathers"),
+    p(
+      "Winter makes the table smaller. Not physically — it is the same wooden table with the same pale ring from a hot teapot — but by dusk everyone sits closer. The lamp is lower. The bowls are deeper. Conversation arrives in shorter sentences because steam is rising between us and because the day has already taken enough explanation. This is the final room in the house with seasons: the table that gathers without insisting."
+    ),
+    p(
+      "The winter table begins earlier than dinner. It begins when I put a pot on the stove at four, not because the soup needs three hours, but because the apartment needs the promise of dinner before dark. Leek, carrot, a little barley, the end of a cabbage, water, salt, time. The sound is not much. A wooden spoon against the pot. The smallest simmer. Someone coming through the room and lifting the lid just to look."
+    ),
+    figure("s23", 1, "soup beginning before dark"),
+    p(
+      "Figure 1 — A pot started at four o’clock so the room can believe in dinner before evening arrives."
+    ),
+    pullQuote("Warmth is not the same as spectacle. Warmth is repeatable."),
+    p(
+      "There is a kind of hosting that tries to defeat winter with abundance: too many plates, too much wine, a table crowded to prove we are not cold. I understand the impulse. I have done it. But the winter table that saves me is plainer. It has soup, bread, pickles, perhaps an orange cut into wedges. It leaves enough space for elbows, notebooks, a small bowl of repair buttons, the unsorted mail no one has the energy to move."
+    ),
+    h2("Plain food, deep bowls"),
+    p(
+      "Warmth is not the same as spectacle. Warmth is repeatable. Warmth is the person who knows where the ladle is. Warmth is a second bowl offered before anyone asks. Warmth is the permission to be quiet while eating, and then to talk again when the body has come back from wherever the cold sent it."
+    ),
+    p(
+      "I keep a winter table list taped inside a cabinet door. It is not a menu; it is a reassurance. Soup with grain. Something sharp. Something green if there is green. Bread or rice. Citrus. Tea. The list is short enough to remember and forgiving enough to survive a day when the market was closed or everyone came home late."
+    ),
+    p(
+      "The sharp thing is important. Pickled daikon, a spoon of kimchi, the cucumber jar from last week, a little mustard stirred into oil and vinegar. Winter food can become all softness and no edge. The pickle is not decoration. It wakes the mouth up. It reminds the soup that it is not alone."
+    ),
+    h2("Repair as a course"),
+    p(
+      "After dinner, if nobody leaves the table immediately, I bring out the repair bowl. Buttons, thread, a sweater with one loose cuff, the cloth napkin whose hem has begun to fail. This sounds quaint until you try it. Repair after soup is less a chore than a continuation of eating: hands warmed, shoulders lower, everyone willing to mend one small thing because the room has already made stillness available."
+    ),
+    figure("s23", 2, "the repair bowl after dinner"),
+    p(
+      "Figure 2 — Buttons, thread, and a quiet table: the domestic second course winter understands."
+    ),
+    p(
+      "I have learned to leave one seat at the winter table unofficially open. Not for a guest, exactly, though guests are welcome. The open seat is for whatever the day brought in: a wet umbrella, a difficult email, a child’s drawing, the newspaper folded to a bad headline, the silence someone needs before they can speak. In summer we scatter these things across rooms. In winter they come to the table and sit with us until soup makes them smaller."
+    ),
+    p(
+      "The table also changes how I measure enough. In brighter months I confuse enough with variety: three salads, two sauces, a dessert no one needs. In winter enough is weight and return. The pot can be ladled again. The bread can be torn. The kettle can be filled without asking who wants tea because everyone does, eventually. Repetition is not dull here. It is what lets the body believe the house will hold."
+    ),
+
+    p(
+      "The series ends here because winter reveals the house most clearly. Spring teaches air; summer teaches restraint; winter teaches return. Every object has to earn its place when the windows are closed and the coats are heavy. The chipped bowl stays because hands reach for it. The extra platter goes because it never leaves the shelf. The table keeps the evidence. Night after night it shows us which practices actually warm the room and which ones only looked beautiful in better light."
+    ),
+
+    p(
+      "When the dishes are finally stacked, the table still holds warmth for a few minutes. I leave the lamp on while the room empties. The glow over crumbs and thread is evidence that the gathering happened, small and sufficient, and that tomorrow the same plain invitation can be made again."
+    ),
+
+    p(
+      "If the house with seasons has a winter rule, it is this: make one place where returning is easier than leaving. The table does not need to be grand; it needs to be ready."
+    ),
+
+    p(
+      "Readiness is mostly unglamorous. The matches are where they should be. The tea tin is not empty. There is broth in the freezer, or at least a jar of beans that can become something honest with garlic and time. I have come to love this inventory of almost-nothing because it lowers the threshold for gathering. A table cannot be generous if every meal begins with panic. It becomes generous when the ordinary supplies of warmth are easy to find."
+    ),
+
+    p(
+      "I think this is why I forgive winter more at the table than anywhere else. The season narrows the day, then hands back closeness as compensation. We accept it one bowl at a time."
+    ),
+
+    p(
+      "The winter table does not make the season easy. It does not remove darkness or deadlines or the way cold finds the gap under the door. It does something smaller and more reliable. It gathers the household around a pot, a lamp, a few repaired things, and says: here is enough heat for tonight. Come closer. Take another bowl."
+    )
+  ),
+  s24: doc(
+    h2("A balcony system, not a miracle"),
+    p(
+      "The balcony compost began as an apology. I was tired of throwing away the clean ends of things: carrot peels, tea leaves, the outer leaves of cabbage, stems from herbs that had done their work. They were not dinner anymore, but they did not feel like trash. In a house with no garden and no municipal compost bin nearby, the apology had nowhere to go. So I bought a small lidded tub, drilled more holes than the instructions suggested, and placed it beside the mint."
+    ),
+    p(
+      "Apartment compost is not romantic at first. It is a lesson in scale and humility. You cannot put everything in. You cannot forget it for a month. You cannot expect soil by next Tuesday. The balcony will tell the truth quickly if you become grand. Too many citrus peels and it smells sharp. Too much wet rice and it turns sour. No dry leaves and the whole thing becomes a sulking, airless paste."
+    ),
+    figure("s24", 1, "a small balcony compost station"),
+    p(
+      "Figure 1 — A drilled tub, dry leaves, and a bowl for scraps: compost sized for an apartment balcony."
+    ),
+    pullQuote(
+      "Good compost smells like forest floor after rain, even when it is only a shoebox of scraps on the fourth floor."
+    ),
+    p(
+      "The good news is that a small system teaches quickly because there is nowhere for mistakes to hide. I learned the ratio by hand: two handfuls of dry brown material for every handful of kitchen scraps. Torn paper bags, dried leaves from the street tree, the brittle stems of herbs, a little used potting soil. I keep them in a crate under the bench. The crate is less pretty than a ceramic planter and more important."
+    ),
+    h2("The smell is information"),
+    p(
+      "Every few days I open the tub and listen with my nose. Good compost smells like forest floor after rain, even when it is only a shoebox of scraps on the fourth floor. Bad compost smells like something asking for help. Usually the help is dry leaves and air. I add both, turn the pile with a small trowel, and leave it alone."
+    ),
+    p(
+      "The first month I kept a notebook because I did not trust myself to learn by smell alone. Tuesday: tea leaves, apple peel, dry paper. Friday: too wet, added leaves. Sunday: turned, better. The notes were boring and therefore useful. They made the compost less mysterious. They also made my kitchen less theatrical about waste. A carrot peel was no longer evidence of failure. It was Tuesday's nitrogen."
+    ),
+    p(
+      "There are rules I now keep without drama. No meat, no fish, no dairy. Citrus in small amounts. Rice only if it is mixed well with dry material. Chop large scraps because a balcony bin is not a forest and does not have forest patience. Cover each addition with browns. Turn when the smell asks. Stop adding for a week if the tub seems overwhelmed."
+    ),
+    h2("What the finished handful does"),
+    p(
+      "The first finished compost was not much: two dark handfuls sifted from the bottom after three months, more symbolic than agricultural. I mixed it into the mint pot anyway. The mint did not applaud. It simply kept growing. That was enough. The point was not to feed the whole balcony from scraps. The point was to keep a small loop visible: peel, leaf, air, time, soil, mint, tea."
+    ),
+    figure("s24", 2, "finished compost folded into mint"),
+    p(
+      "Figure 2 — The loop becomes visible only by the handful: dark compost, mint roots, patient soil."
+    ),
+    p(
+      "I began to notice how compost changed my shopping before it changed my soil. I bought fewer herbs in plastic boxes because watching half a box become nitrogen is still watching half a box become a failure of attention. I bought carrots with tops only when I knew what the tops would do. I saved onion skins for broth instead of the bin. The compost did not make me virtuous. It made the consequences legible at a scale small enough to correct."
+    ),
+    p(
+      "Neighbors have opinions about balcony compost, and they are right to. Smell travels. Flies are not a private matter. I keep the tub shaded, sealed, and balanced because the practice has to be courteous to become sustainable. Mindful living is sometimes presented as an interior mood, but the balcony corrects that. My scraps meet someone else's laundry line. My patience, or lack of it, enters the shared air. A good bin is a neighborly object."
+    ),
+
+    p(
+      "When friends ask whether they should start, I tell them to begin with a month of observation before buying anything fancy. Put a bowl near the sink and notice what would go in it. Notice how wet your scraps are, how often you cook, whether you have leaves or shredded paper, whether your balcony gets punishing sun. Compost is often described as transformation, but before transformation comes attention. The bin should match the life you already have, not the virtuous life you imagine on a Sunday afternoon."
+    ),
+
+    p(
+      "The balcony now has a rhythm I trust: scraps on Wednesday, leaves on Friday, turning on Sunday if the air is dry. It is not self-sufficient and not effortless. It is simply alive enough to require relationship, which may be the most honest thing a small domestic system can ask."
+    ),
+
+    p(
+      "If balcony compost has a rule, it is this: keep the loop small enough that you can stay honest with it. The small loop, repeated, is the practice."
+    ),
+
+    p(
+      "A small balcony cannot fix a city's waste problem. I do not need it to. The tub is not a solution; it is a practice. It changes the pace at which I throw things away. It asks me to notice moisture, carbon, smell, and time. It makes usefulness feel less like a purchase and more like a return. On mornings when I open the lid and smell rain-dark soil, I believe in small loops again."
     )
   ),
   s20: doc(

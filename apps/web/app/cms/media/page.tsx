@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CmsShell } from "@/_components/cms-shell";
 import { can, useCmsAuth } from "@/lib/cms-auth";
+import { uploadMediaAsset } from "@/lib/media-upload";
 
 interface MediaItem {
   alt: string;
@@ -12,8 +13,6 @@ interface MediaItem {
   mimeType: string;
   url: string;
 }
-
-const EXT_RE = /\.[^.]+$/;
 
 function MediaGrid({
   assets,
@@ -86,18 +85,12 @@ export default function CmsMediaPage() {
   const upload = useCallback(
     async (file: File) => {
       setUploading(true);
-      const form = new FormData();
-      form.append("file", file);
-      form.append("alt", file.name.replace(EXT_RE, ""));
-      const res = await fetch("/api/cms/media", {
-        method: "POST",
-        headers: { "x-cms-role": role },
-        body: form,
-      });
-      if (res.ok) {
+      try {
+        await uploadMediaAsset(file, role);
         await load();
+      } finally {
+        setUploading(false);
       }
-      setUploading(false);
     },
     [role, load]
   );

@@ -114,8 +114,13 @@ describe.skipIf(skip)("CMS members admin routes (issue #134)", () => {
     const audit = await prisma.auditLog.findMany({
       where: { memberId: TEST_MEMBER_ID },
     });
+    const growth = await prisma.growthItem.findMany({
+      where: { userId: TEST_MEMBER_ID },
+    });
     expect(ledger).toHaveLength(1);
     expect(audit).toHaveLength(1);
+    expect(growth).toHaveLength(1);
+    expect(growth[0]).toMatchObject({ nutrients: 7, level: 1 });
     expect(audit[0]).toMatchObject({
       action: "point_adjust",
       adminId: "test_customer-service",
@@ -124,6 +129,24 @@ describe.skipIf(skip)("CMS members admin routes (issue #134)", () => {
       balanceAfter: 7,
       reason: "service recovery",
     });
+
+    const negativeAdjustment = await POST(
+      new Request(
+        `http://localhost/api/cms/members/${TEST_MEMBER_ID}/point-adjust`,
+        {
+          method: "POST",
+          headers: cmsHeaders("admin"),
+          body: JSON.stringify({ amount: -2, reason: "correction" }),
+        }
+      ),
+      { params: Promise.resolve({ id: TEST_MEMBER_ID }) }
+    );
+    expect(negativeAdjustment.status).toBe(200);
+    const unchangedGrowth = await prisma.growthItem.findMany({
+      where: { userId: TEST_MEMBER_ID },
+    });
+    expect(unchangedGrowth).toHaveLength(1);
+    expect(unchangedGrowth[0]).toMatchObject({ nutrients: 7, level: 1 });
   });
 
   test("soft-delete role matrix filters list unless includeDeleted", async () => {

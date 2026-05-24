@@ -72,6 +72,8 @@ model Article {
   // promotes this to a relation if needed.
   section      String?
 
+  versions ArticleVersion[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -81,6 +83,23 @@ model Article {
   @@index([submittedBy])
   @@index([status])
   @@map("articles")
+}
+
+/// CMS article version snapshot (issue #137). One row per `Save
+/// version` action on a draft. The full serialized article body
+/// lives on the `snapshot` JSON column so a future restore can
+/// reconstruct the row without tracking per-field history. Indexed
+/// on `(articleId, timestamp)` for the per-article timeline view.
+model ArticleVersion {
+  id        String   @id @default(cuid())
+  articleId String
+  timestamp DateTime @default(now())
+  snapshot  Json
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, timestamp])
+  @@map("article_versions")
 }
 
 /// Identity role exposed as a JWT claim by the Auth.js callbacks
@@ -115,6 +134,7 @@ model User {
   pointLedger   PointLedgerEntry[]
   growthItems   GrowthItem[]
   auditLogs     AuditLog[]
+  redemptions   Redemption[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -272,10 +292,37 @@ model GrowthItem {
   redemptionId String?
   createdAt    DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redemption Redemption?
 
   @@index([userId])
   @@map("growth_items")
+}
+
+/// Grow redemption (issue #132). A completed growth item can be
+/// redeemed exactly once; `growthItemId` is unique so concurrent or
+/// repeated redemption attempts are rejected by Postgres, not only by
+/// app code. The mocked reward provider produces a `VERDA-PLANT-NN`
+/// code keyed off the per-member `growthItem.sequence` so demo flows
+/// stay deterministic.
+model Redemption {
+  id                 String    @id
+  userId             String
+  growthItemId       Int       @unique
+  growthItemSequence Int
+  provider           String    @default("mock")
+  rewardCode         String
+  displayName        String?
+  expiresAt          DateTime?
+  fulfillmentRef     String?
+  metadata           Json?
+  createdAt          DateTime  @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  growthItem GrowthItem @relation(fields: [growthItemId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("redemptions")
 }
 
 /// Reader engagement: saved article collection (issue #131).
@@ -344,6 +391,26 @@ model AuditLog {
   @@index([memberId, createdAt])
   @@index([action])
   @@map("audit_log")
+}
+
+/// CMS media asset metadata (issue #136). Binary payloads live in
+/// Supabase Storage in production, or a local filesystem adapter for
+/// docker-compose / offline development; this table stores only the
+/// renderable public URL plus the upload metadata. The unique
+/// `path` index doubles as the de-dup guard for re-records.
+model MediaAsset {
+  id        String   @id @default(cuid())
+  filename  String
+  mimeType  String
+  url       String
+  alt       String   @default("")
+  path      String   @unique
+  provider  String   @default("local")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([mimeType])
+  @@map("media_assets")
 }
 
 /// Achievement badges (issue #138). Unique on [userId, badgeId] so

@@ -1,5 +1,6 @@
 import { prisma } from "@verda/database";
 import { NextResponse } from "next/server";
+import { allocateGrowth } from "../../../../_lib/growth-allocation";
 import { guardRole } from "../../../../_lib/guard-role";
 import { currentBalance, levelForBalance } from "../../route";
 import { adminIdForRequest } from "../route";
@@ -65,6 +66,9 @@ export async function POST(
         reason,
       },
     });
+    if (amount > 0) {
+      await allocateGrowth(tx, id, amount);
+    }
     await tx.auditLog.create({
       data: {
         memberId: id,
