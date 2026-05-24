@@ -11,9 +11,14 @@ interface Params {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: Params
 ): Promise<Response> {
+  const denied = await guardRole(request, "manage_rules");
+  if (denied) {
+    return denied;
+  }
+
   const { id } = await params;
   const rule = await prisma.rewardRule.findUnique({ where: { id } });
   return rule ? NextResponse.json(rule) : notFound();

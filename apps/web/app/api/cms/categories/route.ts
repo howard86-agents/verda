@@ -11,7 +11,12 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const denied = await guardRole(request, "manage_taxonomy");
+  if (denied) {
+    return denied;
+  }
+
   const categories = await prisma.category.findMany({
     orderBy: { name: "asc" },
   });

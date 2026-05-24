@@ -5,7 +5,12 @@ import { growthPayload, updateGrowthConfig, updateGrowthRule } from "../_lib";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const denied = await guardRole(request, "manage_rules");
+  if (denied) {
+    return denied;
+  }
+
   return NextResponse.json(await growthPayload());
 }
 

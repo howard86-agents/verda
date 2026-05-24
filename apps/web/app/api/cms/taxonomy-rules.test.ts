@@ -36,6 +36,28 @@ function uniqueName(prefix: string): string {
   return `${prefix} ${Date.now()} ${Math.random().toString(36).slice(2, 8)}`;
 }
 
+describe("CMS taxonomy + rules route guards (issue #135)", () => {
+  test("GET /api/cms/categories is gated by manage_taxonomy", async () => {
+    const { GET } = await import("./categories/route");
+    const res = await GET(
+      new Request("http://localhost/api/cms/categories", {
+        headers: cmsHeaders("editor"),
+      })
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("GET /api/cms/rules/growth is gated by manage_rules", async () => {
+    const { GET } = await import("./rules/growth/route");
+    const res = await GET(
+      new Request("http://localhost/api/cms/rules/growth", {
+        headers: cmsHeaders("editor"),
+      })
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
 describe.skipIf(skip)("CMS taxonomy routes (issue #135)", () => {
   test("POST /api/cms/categories maps duplicate names to 409", async () => {
     const { POST } = await import("./categories/route");

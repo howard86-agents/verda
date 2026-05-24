@@ -17,9 +17,14 @@ interface Params {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: Params
 ): Promise<Response> {
+  const denied = await guardRole(request, "manage_taxonomy");
+  if (denied) {
+    return denied;
+  }
+
   const { id } = await params;
   const tag = await prisma.tag.findUnique({ where: { id } });
   return tag ? NextResponse.json(tag) : notFound();
