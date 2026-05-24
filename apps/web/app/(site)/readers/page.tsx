@@ -7,6 +7,7 @@ import { CoverImage } from "@/_components/cover-image";
 import { Eyebrow } from "@/_components/eyebrow";
 import { IconFilter } from "@/_components/glyphs";
 import type { Article } from "@/lib/db";
+import { fetchReaderStories } from "@/lib/reader-stories";
 
 type SocialKind = "all" | "submission" | "repost" | "remix";
 
@@ -35,15 +36,7 @@ export default function ReadersPage() {
 
   const { data: articles, isLoading } = useQuery<Article[]>({
     queryKey: ["stories", "social"],
-    queryFn: async () => {
-      const res = await fetch("/api/stories?kind=submission");
-      const submissions: Article[] = await res.json();
-      const res2 = await fetch("/api/stories?kind=repost");
-      const reposts: Article[] = await res2.json();
-      const res3 = await fetch("/api/stories?kind=remix");
-      const remixes: Article[] = await res3.json();
-      return [...submissions, ...reposts, ...remixes];
-    },
+    queryFn: fetchReaderStories,
   });
 
   if (isLoading) {
