@@ -1,7 +1,13 @@
 import { prisma } from "@verda/database";
 import { NextResponse } from "next/server";
 import { guardRole } from "../../../_lib/guard-role";
-import { invalid, notFound } from "../../_lib/route-utils";
+import {
+  conflict,
+  invalid,
+  isMissingRecord,
+  isUniqueConflict,
+  notFound,
+} from "../../_lib/route-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,14 +41,37 @@ export async function PUT(
   }
 
   try {
-    const tag = await prisma.tag.update({
-      where: { id },
-      data: { name: body.name.trim() },
+    const nextName = body.name.trim();
+    const tag = await prisma.$transaction(async (tx) => {
+      const current = await tx.tag.findUnique({ where: { id } });
+      if (!current) {
+        return null;
+      }
+
+      const updated = await tx.tag.update({
+        where: { id },
+        data: { name: nextName },
+      });
+
+      if (current.name !== updated.name) {
+        await tx.article.updateMany({
+          where: { tag: current.name },
+          data: { tag: updated.name },
+        });
+      }
+
+      return updated;
     });
+    if (!tag) {
+      return notFound();
+    }
     return NextResponse.json(tag);
   } catch (error: unknown) {
     if (isMissingRecord(error)) {
       return notFound();
+    }
+    if (isUniqueConflict(error)) {
+      return conflict("Tag already exists");
     }
     throw error;
   }
@@ -65,23 +94,11 @@ export async function DELETE(
 
   const refs = await prisma.article.count({ where: { tag: tag.name } });
   if (refs > 0) {
-    return NextResponse.json(
-      {
-        error: `Cannot delete: ${refs} article(s) use this tag. Reassign them first.`,
-      },
-      { status: 409 }
+    return conflict(
+      `Cannot delete: ${refs} article(s) use this tag. Reassign them first.`
     );
   }
 
   await prisma.tag.delete({ where: { id } });
   return NextResponse.json({ ok: true });
-}
-
-function isMissingRecord(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code: string }).code === "P2025"
-  );
 }

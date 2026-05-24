@@ -1,7 +1,12 @@
 import { prisma } from "@verda/database";
 import { NextResponse } from "next/server";
 import { guardRole } from "../../_lib/guard-role";
-import { invalid, slugify } from "../_lib/route-utils";
+import {
+  conflict,
+  invalid,
+  isUniqueConflict,
+  slugify,
+} from "../_lib/route-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +31,13 @@ export async function POST(request: Request): Promise<Response> {
 
   const name = body.name.trim();
   const id = body.id?.trim() || slugify(name);
-  const category = await prisma.category.create({ data: { id, name } });
-  return NextResponse.json(category, { status: 201 });
+  try {
+    const category = await prisma.category.create({ data: { id, name } });
+    return NextResponse.json(category, { status: 201 });
+  } catch (error: unknown) {
+    if (isUniqueConflict(error)) {
+      return conflict("Category already exists");
+    }
+    throw error;
+  }
 }

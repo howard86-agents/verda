@@ -37,6 +37,126 @@ function uniqueName(prefix: string): string {
 }
 
 describe.skipIf(skip)("CMS taxonomy routes (issue #135)", () => {
+  test("POST /api/cms/categories maps duplicate names to 409", async () => {
+    const { POST } = await import("./categories/route");
+    const name = uniqueName("Duplicate Category");
+    const create = await POST(
+      new Request("http://localhost/api/cms/categories", {
+        method: "POST",
+        headers: cmsHeaders("admin"),
+        body: JSON.stringify({ name }),
+      })
+    );
+    expect(create.status).toBe(201);
+    const category = (await create.json()) as { id: string; name: string };
+
+    try {
+      const duplicate = await POST(
+        new Request("http://localhost/api/cms/categories", {
+          method: "POST",
+          headers: cmsHeaders("admin"),
+          body: JSON.stringify({ name }),
+        })
+      );
+      expect(duplicate.status).toBe(409);
+      const body = (await duplicate.json()) as { error: string };
+      expect(body.error).toContain("Category already exists");
+    } finally {
+      await prisma.category.deleteMany({ where: { id: category.id } });
+    }
+  });
+
+  test("PUT /api/cms/categories/:id renames article category labels", async () => {
+    const { POST } = await import("./categories/route");
+    const { PUT } = await import("./categories/[id]/route");
+    const name = uniqueName("Rename Category");
+    const nextName = uniqueName("Renamed Category");
+    const create = await POST(
+      new Request("http://localhost/api/cms/categories", {
+        method: "POST",
+        headers: cmsHeaders("admin"),
+        body: JSON.stringify({ name }),
+      })
+    );
+    expect(create.status).toBe(201);
+    const category = (await create.json()) as { id: string; name: string };
+
+    const article = await prisma.article.create({
+      data: {
+        slug: `taxonomy-rename-${category.id}`,
+        title: "Renamed taxonomy article",
+        cat: category.name,
+        tag: "taxonomy-test",
+        kind: "brand",
+        status: "draft",
+      },
+    });
+
+    try {
+      const res = await PUT(
+        new Request(`http://localhost/api/cms/categories/${category.id}`, {
+          method: "PUT",
+          headers: cmsHeaders("admin"),
+          body: JSON.stringify({ name: nextName }),
+        }),
+        { params: Promise.resolve({ id: category.id }) }
+      );
+      expect(res.status).toBe(200);
+      const renamed = (await res.json()) as { name: string };
+      expect(renamed.name).toBe(nextName);
+      const changedArticle = await prisma.article.findUniqueOrThrow({
+        where: { id: article.id },
+      });
+      expect(changedArticle.cat).toBe(nextName);
+    } finally {
+      await prisma.article.deleteMany({ where: { id: article.id } });
+      await prisma.category.deleteMany({ where: { id: category.id } });
+    }
+  });
+
+  test("PUT /api/cms/tags/:id maps duplicate renames to 409", async () => {
+    const { POST } = await import("./tags/route");
+    const { PUT } = await import("./tags/[id]/route");
+    const originalName = uniqueName("Original Tag");
+    const duplicateName = uniqueName("Duplicate Tag");
+    const originalRes = await POST(
+      new Request("http://localhost/api/cms/tags", {
+        method: "POST",
+        headers: cmsHeaders("admin"),
+        body: JSON.stringify({ name: originalName }),
+      })
+    );
+    const duplicateRes = await POST(
+      new Request("http://localhost/api/cms/tags", {
+        method: "POST",
+        headers: cmsHeaders("admin"),
+        body: JSON.stringify({ name: duplicateName }),
+      })
+    );
+    expect(originalRes.status).toBe(201);
+    expect(duplicateRes.status).toBe(201);
+    const original = (await originalRes.json()) as { id: string };
+    const duplicate = (await duplicateRes.json()) as { id: string };
+
+    try {
+      const res = await PUT(
+        new Request(`http://localhost/api/cms/tags/${original.id}`, {
+          method: "PUT",
+          headers: cmsHeaders("admin"),
+          body: JSON.stringify({ name: duplicateName }),
+        }),
+        { params: Promise.resolve({ id: original.id }) }
+      );
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toContain("Tag already exists");
+    } finally {
+      await prisma.tag.deleteMany({
+        where: { id: { in: [original.id, duplicate.id] } },
+      });
+    }
+  });
+
   test("DELETE /api/cms/categories/:id blocks referenced categories", async () => {
     const { POST } = await import("./categories/route");
     const { DELETE } = await import("./categories/[id]/route");
