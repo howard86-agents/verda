@@ -9,6 +9,8 @@ export type {
   $Enums,
   Article,
   ArticleVersion,
+  AuditLog,
+  MemberProfile,
   Prisma,
   Section,
   User,
