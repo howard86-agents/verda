@@ -145,7 +145,9 @@ export default function RewardRulesPage() {
   const { data: rules = [], isLoading } = useQuery<RewardRuleDTO[]>({
     queryKey: ["cms-reward-rules"],
     queryFn: async () => {
-      const res = await fetch("/api/cms/rules/rewards");
+      const res = await fetch("/api/cms/rules/rewards", {
+        headers: { "x-cms-role": role },
+      });
       return res.json();
     },
   });

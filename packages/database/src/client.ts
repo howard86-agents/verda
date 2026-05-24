@@ -10,9 +10,11 @@ export type {
   Article,
   ArticleVersion,
   AuditLog,
+  Category,
   MemberProfile,
   Prisma,
   Section,
+  Tag,
   User,
 } from "../generated/client";
 

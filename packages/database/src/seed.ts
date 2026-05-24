@@ -1,5 +1,11 @@
 import "dotenv/config";
-import { GROWTH_LEVELS, MEMBER, SECTIONS, STORIES } from "@verda/data";
+import {
+  CATEGORIES,
+  GROWTH_LEVELS,
+  MEMBER,
+  SECTIONS,
+  STORIES,
+} from "@verda/data";
 import type { $Enums, Prisma } from "../generated/client";
 import { prisma } from "./client";
 
@@ -284,14 +290,56 @@ async function seedGamificationRules(): Promise<void> {
   }
 }
 
+async function seedTaxonomy(): Promise<{ categories: number; tags: number }> {
+  // Seed CMS-managed categories from the public taxonomy. The "All"
+  // pseudo-category is the listing-page filter sentinel, not a real
+  // row.
+  for (const name of CATEGORIES.filter((category) => category !== "All")) {
+    const id = slugify(name);
+    await prisma.category.upsert({
+      where: { id },
+      update: { name },
+      create: { id, name },
+    });
+  }
+
+  // Tags are derived from the seeded stories so the CMS dropdown
+  // mirrors the live content surface from day one.
+  const tagNames = [
+    ...new Set(STORIES.map((story) => story.tag).filter(Boolean)),
+  ];
+  for (const name of tagNames) {
+    const id = slugify(name);
+    await prisma.tag.upsert({
+      where: { id },
+      update: { name },
+      create: { id, name },
+    });
+  }
+
+  const [categories, tags] = await Promise.all([
+    prisma.category.count(),
+    prisma.tag.count(),
+  ]);
+  return { categories, tags };
+}
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 async function main(): Promise<void> {
   const sectionCount = await seedSections();
   const articleCount = await seedArticles();
   const readerCount = await seedReaders();
   const staffCount = await seedStaff();
   await seedGamificationRules();
+  const taxonomyCount = await seedTaxonomy();
   console.log(
-    `[seed] sections=${sectionCount} articles=${articleCount} readers=${readerCount} staff=${staffCount} gamification=seeded`
+    `[seed] sections=${sectionCount} articles=${articleCount} readers=${readerCount} staff=${staffCount} gamification=seeded categories=${taxonomyCount.categories} tags=${taxonomyCount.tags}`
   );
 }
 
