@@ -133,6 +133,7 @@ model User {
   behaviorLogs  BehaviorLog[]
   pointLedger   PointLedgerEntry[]
   growthItems   GrowthItem[]
+  auditLogs     AuditLog[]
   redemptions   Redemption[]
 
   createdAt DateTime @default(now())
@@ -197,11 +198,12 @@ model VerificationToken {
 /// slices (#130 gamification core, #131 reader engagement) populate.
 /// Staff users without a reader-side surface skip this row.
 model MemberProfile {
-  id          String @id @default(cuid())
-  userId      String @unique
+  id          String    @id @default(cuid())
+  userId      String    @unique
   displayName String
-  joined      String @default("")
-  initial     String @default("")
+  joined      String    @default("")
+  initial     String    @default("")
+  deletedAt   DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -365,6 +367,30 @@ model Reaction {
   @@unique([userId, articleId, kind])
   @@index([articleId])
   @@map("reactions")
+}
+
+/// CMS audit log (issue #134). Captures admin-initiated mutations on
+/// members — manual point adjustments and soft-deletes — so the
+/// member-detail panel can show an immutable trail and downstream
+/// auditors can correlate actions to admin operators. Indexed on
+/// `(memberId, createdAt)` for the per-member detail timeline and on
+/// `action` for global filtering of point adjustments / deletions.
+model AuditLog {
+  id            Int      @id @default(autoincrement())
+  memberId      String
+  adminId       String
+  action        String
+  reason        String
+  amount        Int?
+  balanceBefore Int?
+  balanceAfter  Int?
+  createdAt     DateTime @default(now())
+
+  member User @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, createdAt])
+  @@index([action])
+  @@map("audit_log")
 }
 
 /// CMS media asset metadata (issue #136). Binary payloads live in
