@@ -203,7 +203,9 @@ export default function GrowthRulesPage() {
   const { data, isLoading } = useQuery<GrowthSettingsDTO>({
     queryKey: ["cms-growth-rules"],
     queryFn: async () => {
-      const res = await fetch("/api/cms/rules/growth");
+      const res = await fetch("/api/cms/rules/growth", {
+        headers: { "x-cms-role": role },
+      });
       return res.json();
     },
   });

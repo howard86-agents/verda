@@ -279,7 +279,9 @@ describe.skipIf(skip)("CMS rule routes (issue #135)", () => {
       expect(configRes.status).toBe(200);
 
       const getRes = await GET(
-        new Request("http://localhost/api/cms/rules/growth")
+        new Request("http://localhost/api/cms/rules/growth", {
+          headers: cmsHeaders("admin"),
+        })
       );
       const body = (await getRes.json()) as {
         config: { maxItemsPerMember: number };
