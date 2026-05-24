@@ -168,7 +168,9 @@ export default function TaxonomyPage() {
   const { data: categories = [] } = useQuery<TaxItem[]>({
     queryKey: ["cms-categories"],
     queryFn: async () => {
-      const res = await fetch("/api/cms/categories");
+      const res = await fetch("/api/cms/categories", {
+        headers: { "x-cms-role": role },
+      });
       return res.json();
     },
   });
@@ -176,7 +178,9 @@ export default function TaxonomyPage() {
   const { data: tags = [] } = useQuery<TaxItem[]>({
     queryKey: ["cms-tags"],
     queryFn: async () => {
-      const res = await fetch("/api/cms/tags");
+      const res = await fetch("/api/cms/tags", {
+        headers: { "x-cms-role": role },
+      });
       return res.json();
     },
   });

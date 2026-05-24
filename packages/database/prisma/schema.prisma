@@ -29,6 +29,29 @@ model Section {
   @@map("sections")
 }
 
+/// CMS-managed category taxonomy (issue #135). Article rows still
+/// store the public category label in `Article.cat` for backwards
+/// compatibility, so the admin delete route checks references by
+/// `Category.name` rather than by id. The id is the slug of the
+/// canonical name; both the slug and the name are unique.
+model Category {
+  id   String @id
+  name String @unique
+
+  @@map("categories")
+}
+
+/// CMS-managed tag taxonomy (issue #135). Article rows still store
+/// the public tag label in `Article.tag`, so the admin delete route
+/// checks references by `Tag.name`. Same id-as-slug shape as
+/// `Category`.
+model Tag {
+  id   String @id
+  name String @unique
+
+  @@map("tags")
+}
+
 /// A single article — brand longread or reader-contributed item.
 ///
 /// `slug` is the public URL key and is unique. Field names match the
