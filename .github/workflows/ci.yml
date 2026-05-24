@@ -15,11 +15,25 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: verda_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
-      # `prisma generate` runs as a dep of `turbo run typecheck`. It only needs
-      # the schema, not a real DB, but prisma.config.ts wants DATABASE_URL set.
-      DATABASE_URL: postgresql://placeholder@localhost:5432/placeholder
-      TURBO_TELEMETRY_DISABLED: 1
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/verda_test
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/verda_test
+      NEXTAUTH_SECRET: ci-nextauth-secret
+      AUTH_SECRET: ci-auth-secret
     steps:
       - uses: actions/checkout@v6
         with:
@@ -42,16 +56,38 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Prepare database
+        run: |
+          cd packages/database
+          bun run db:migrate:deploy
+          bun run db:seed
+
       - name: Lint (ultracite)
         run: bun run check
 
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Tests
+        run: bun test
+
+      - name: Install Playwright browser
+        run: cd apps/web && bunx playwright install --with-deps chromium
+
+      - name: Reader profile Playwright smoke
+        run: cd apps/web && bunx playwright test e2e/reader-profile.spec.ts
+
       - name: Spell-check (typos)
         uses: crate-ci/typos@master
 
-      - name: Secret scan (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+      - name: Install gitleaks
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.28.0
+        run: |
+          curl -sSL -o /tmp/gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Secret scan (gitleaks)
+        run: gitleaks detect --source . --no-banner --redact --verbose

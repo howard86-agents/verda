@@ -26,12 +26,22 @@ export async function GET(): Promise<Response> {
     : [];
   const submitterById = new Map(submitters.map((user) => [user.id, user]));
 
-  const items = submissions.map((submission) => ({
-    ...serializeArticle(submission),
-    submitter: submission.submittedBy
+  const items = submissions.map((submission) => {
+    const submitter = submission.submittedBy
       ? (submitterById.get(submission.submittedBy) ?? null)
-      : null,
-  }));
+      : null;
+    return {
+      ...serializeArticle(submission),
+      submittedAt: submission.createdAt.toISOString(),
+      submittedBy: submission.submittedBy ?? null,
+      submitter,
+      submitterName:
+        submitter?.name ??
+        submitter?.email ??
+        submission.submittedBy ??
+        "Anonymous",
+    };
+  });
 
-  return NextResponse.json({ items });
+  return NextResponse.json({ items, total: items.length });
 }

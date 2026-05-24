@@ -118,16 +118,21 @@ describe.skipIf(skip)("CMS submission queue (issue #133)", () => {
       items: Array<{
         id: string;
         status: string;
+        submittedAt: string;
+        submittedBy: string | null;
         submitter: { id: string; name: string | null } | null;
+        submitterName: string;
       }>;
+      total: number;
     };
     const ours = body.items.filter((item) => item.status === "pending");
+    expect(body.total).toBe(body.items.length);
     expect(ours.length).toBeGreaterThan(0);
-    const target = ours.find((item) =>
-      item.submitter ? item.submitter.id === TEST_USER_ID : false
-    );
+    const target = ours.find((item) => item.submittedBy === TEST_USER_ID);
     expect(target).toBeDefined();
+    expect(target?.submittedAt).toBeTruthy();
     expect(target?.submitter?.id).toBe(TEST_USER_ID);
+    expect(target?.submitterName).toBe("Submission Queue 133");
   });
 
   test("approve is publish-gated, publishes once, awards points, and evaluates badges", async () => {

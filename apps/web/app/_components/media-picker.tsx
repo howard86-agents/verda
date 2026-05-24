@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCmsAuth } from "@/lib/cms-auth";
+import { uploadMediaAsset } from "@/lib/media-upload";
 
 interface MediaItem {
   alt: string;
@@ -14,8 +15,6 @@ interface MediaPickerProps {
   onClose: () => void;
   onSelect: (asset: { id: string; url: string; alt: string }) => void;
 }
-
-const EXT_RE = /\.[^.]+$/;
 
 export function MediaPicker({ onSelect, onClose }: MediaPickerProps) {
   const { role } = useCmsAuth();
@@ -37,18 +36,12 @@ export function MediaPicker({ onSelect, onClose }: MediaPickerProps) {
   const upload = useCallback(
     async (file: File) => {
       setUploading(true);
-      const form = new FormData();
-      form.append("file", file);
-      form.append("alt", file.name.replace(EXT_RE, ""));
-      const res = await fetch("/api/cms/media", {
-        method: "POST",
-        headers: { "x-cms-role": role },
-        body: form,
-      });
-      if (res.ok) {
+      try {
+        await uploadMediaAsset(file, role);
         await load();
+      } finally {
+        setUploading(false);
       }
-      setUploading(false);
     },
     [role, load]
   );
