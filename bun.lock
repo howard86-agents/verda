@@ -25,6 +25,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@verda/data": "*",
+        "@verda/database": "*",
         "sharp": "^0.34.1",
       },
       "devDependencies": {

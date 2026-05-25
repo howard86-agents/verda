@@ -69,6 +69,38 @@ bun run build       # turbo run build
 
 Server tests in `apps/web/app/api/stories/route.test.ts` skip themselves when `DATABASE_URL` is missing or points at the placeholder so `bun test` stays green in CI without a provisioned database; locally they exercise the full Postgres-backed read path.
 
+## AI CMS draft generation
+
+Use the CLI to create original CMS article draft scaffolds for AI-assisted editorial population. It can use public editorial references such as `https://www.twreporter.org/` for topic/structure inspiration, but generated rows are always new Verda drafts and are never auto-published.
+
+```sh
+# Preview three CMS-ready draft payloads without touching Postgres.
+bun run --cwd apps/cli gen:ai-articles -- --dry-run \
+  --count 3 \
+  --reference-url https://www.twreporter.org/ \
+  --theme "urban ecology and everyday wellbeing"
+
+# Write draft articles to Postgres. Source .env first if your shell does not
+# already export DATABASE_URL / DIRECT_URL for the database package.
+set -a; . ./.env; set +a
+bun run --cwd apps/cli gen:ai-articles -- \
+  --count 3 \
+  --reference-url https://www.twreporter.org/
+```
+
+Options:
+
+| Flag | Default | Notes |
+|---|---|---|
+| `--dry-run` | `false` | Prints JSON payloads only; recommended before every write. |
+| `--count` | `3` | Generates 1–10 drafts. |
+| `--section` | rotating sections | Restrict to one of `mindful-living`, `nutrition`, `movement`, `earth-garden`, `recipes`. |
+| `--theme` | section theme | Adds a specific editorial angle. |
+| `--reference-title` | none | Optional inspiration label; validated/truncated as an input signal and not copied into body text. |
+| `--reference-url` | none | Stored on `sourceUrl` for editorial traceability. |
+
+Every generated article has `status: "draft"`, an AI review notice in `license`, and TipTap-compatible `bodyJson`. The CLI keeps source references out of draft body text so editors can use them only as inspiration. Editors should fact-check, source, revise, add media, and publish manually from the CMS.
+
 ## Notes
 
 - `prisma generate` uses a placeholder `DATABASE_URL` if none is set in env, so typecheck and fresh checkouts work without a provisioned database. Commands that actually hit the database (`migrate`, `push`, `studio`) still need a real URL.
