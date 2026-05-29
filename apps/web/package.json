@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.2",
     "@tanstack/react-query": "^5.100.11",
     "@tiptap/extension-image": "^3.23.5",
     "@tiptap/extension-link": "^3.23.5",

@@ -1,13 +1,12 @@
 "use client";
 
-import { signIn, signOut, useSession } from "next-auth/react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { SEEDED_READER_MEMBERS } from "./reader-seed-data";
 
 /**
- * Shape consumed by the existing reader UI (issue #127). The fields
- * mirror the legacy localStorage stub so callers in
- * `_components/*.tsx`, `(site)/.../page.tsx`, and friends round-trip
- * unchanged when the implementation flips onto Auth.js v5.
+ * Shape consumed by the existing reader UI. This is intentionally a
+ * browser-only auth shim so production stays pure client-side MSW/Dexie
+ * and never needs Auth.js/Postgres for the demo sign-in path.
  */
 export interface AuthMember {
   email: string;
@@ -22,15 +21,8 @@ interface AuthCtx {
   member: AuthMember | null;
 }
 
-/**
- * Default email used by the in-product "Sign in" button in
- * `top-nav.tsx` and `auth-gate.tsx`. The legacy stub logged the user
- * in as the seeded `MEMBER` (Mira Tanaka) immediately; we preserve
- * that behaviour by passing her email to the Credentials provider.
- * A future slice (#127's follow-on or a real magic-link flow) can
- * surface a real form.
- */
-const DEFAULT_DEMO_EMAIL = "mira.t@example.com";
+const AUTH_STORAGE_KEY = "verda.member";
+const DEFAULT_MEMBER = SEEDED_READER_MEMBERS[0];
 
 function deriveInitial(name: string | null | undefined, email: string): string {
   const trimmed = (name ?? "").trim();
@@ -40,48 +32,67 @@ function deriveInitial(name: string | null | undefined, email: string): string {
   return email.charAt(0).toUpperCase();
 }
 
-/**
- * `useAuth()` is a thin shim over `useSession()` (issue #127). It
- * collapses Auth.js's `{ data, status }` shape into the legacy
- * `{ member, login, logout }` interface so every caller in
- * `_components/`, `(site)/`, and `lib/use-collection.ts` keeps
- * working. The client component tree stays unchanged.
- */
-export function useAuth(): AuthCtx {
-  const { data: session } = useSession();
+function toAuthMember(member: typeof DEFAULT_MEMBER): AuthMember {
+  return {
+    id: member.id,
+    email: member.email,
+    name: member.name,
+    initial: deriveInitial(member.name, member.email),
+  };
+}
 
-  const member = useMemo<AuthMember | null>(() => {
-    if (!session?.user?.email) {
+function readStoredMember(): AuthMember | null {
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) {
       return null;
     }
-    const id = session.user.id ?? "";
-    if (!id) {
+    const parsed = JSON.parse(raw) as Partial<AuthMember>;
+    if (!(parsed.id && parsed.email && parsed.name)) {
       return null;
     }
     return {
-      id,
-      email: session.user.email,
-      name: session.user.name ?? "",
-      initial: deriveInitial(session.user.name, session.user.email),
+      id: parsed.id,
+      email: parsed.email,
+      name: parsed.name,
+      initial: parsed.initial ?? deriveInitial(parsed.name, parsed.email),
     };
-  }, [session]);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `useAuth()` preserves the legacy `{ member, login, logout }` surface
+ * without a server session. The in-product "Sign in" button logs in as
+ * a seeded reader stored in localStorage, matching the rest of the
+ * client-side MSW demo state.
+ */
+export function useAuth(): AuthCtx {
+  const [member, setMember] = useState<AuthMember | null>(null);
+
+  useEffect(() => {
+    setMember(readStoredMember());
+  }, []);
 
   const login = useCallback(() => {
-    signIn("credentials", {
-      email: DEFAULT_DEMO_EMAIL,
-      redirect: false,
-    }).catch(() => {
-      // Sign-in failures surface via `useSession()` returning a
-      // null user; we don't gate the UI on the call's resolution.
-    });
+    const next = toAuthMember(DEFAULT_MEMBER);
+    setMember(next);
+    try {
+      window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // In-memory state is enough when storage is unavailable.
+    }
   }, []);
 
   const logout = useCallback(() => {
-    signOut({ redirect: false }).catch(() => {
-      // Same rationale as `login`: any failure leaves the session
-      // untouched, which is the safe default.
-    });
+    setMember(null);
+    try {
+      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
   }, []);
 
-  return { member, login, logout };
+  return useMemo(() => ({ member, login, logout }), [member, login, logout]);
 }
