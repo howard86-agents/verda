@@ -1,22 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { isRealApiMode } from "./api-mode";
+import { apiMode, isRealApiMode } from "./api-mode";
 
-describe("isRealApiMode() — issue #126", () => {
-  test("treats the literal string 'real' as real-backend mode", () => {
-    expect(isRealApiMode("real")).toBe(true);
+describe("apiMode — production MSW-only", () => {
+  test("always resolves to mock mode", () => {
+    expect(apiMode).toBe("mock");
   });
 
-  test("treats undefined as mock mode (the safe default)", () => {
+  test("ignores stale real-backend env values", () => {
+    expect(isRealApiMode("real")).toBe(false);
+  });
+
+  test("treats undefined, unknown, and documented mock values as MSW mode", () => {
     expect(isRealApiMode(undefined)).toBe(false);
-  });
-
-  test("treats unknown values as mock mode", () => {
     expect(isRealApiMode("staging")).toBe(false);
     expect(isRealApiMode("")).toBe(false);
     expect(isRealApiMode("REAL")).toBe(false);
-  });
-
-  test("treats the documented 'mock' value as mock mode", () => {
     expect(isRealApiMode("mock")).toBe(false);
   });
 });

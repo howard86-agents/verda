@@ -1,35 +1,26 @@
 /**
- * API_MODE — controls whether MSW intercepts requests for routes that
- * have been migrated to the real Postgres backend (issue #126).
+ * API_MODE — production is intentionally pure client-side MSW.
  *
- * - `mock` (default, also used when the env var is unset or unknown):
- *   MSW handles every route, including the migrated ones, so existing
- *   browser-only behaviour is preserved.
- * - `real`: MSW excludes the migrated handlers, the request bypasses
- *   the worker, and the real Next.js Route Handlers serve it from
- *   Postgres.
- *
- * Reads `NEXT_PUBLIC_API_MODE` so the value is inlined at build time
- * for the client bundle. The flag is intentionally narrow: per-route
- * decisions live in the per-route migrated-handler list rather than
- * here, keeping the cutover footprint visible at the call site.
+ * Verda previously allowed `NEXT_PUBLIC_API_MODE=real` to drop selected
+ * MSW handlers and pass requests through to Postgres-backed Next.js
+ * Route Handlers. Production should now keep the same browser-only
+ * Dexie + MSW path as local/test builds, so the flag is retained only
+ * as a no-op compatibility shim for stale Vercel/env configuration.
  */
-export type ApiMode = "mock" | "real";
-
-const RAW_API_MODE = process.env.NEXT_PUBLIC_API_MODE;
+export type ApiMode = "mock";
 
 /**
- * Normalised view of `NEXT_PUBLIC_API_MODE`. Anything other than the
- * literal string `"real"` resolves to `"mock"` so misconfigured envs
- * fall back to the safe path.
+ * Normalised view of `NEXT_PUBLIC_API_MODE`.
+ *
+ * Always resolves to `mock`; even a stale `NEXT_PUBLIC_API_MODE=real`
+ * must not bypass MSW in production.
  */
-export const apiMode: ApiMode = RAW_API_MODE === "real" ? "real" : "mock";
+export const apiMode: ApiMode = "mock";
 
 /**
- * Convenience: is the worker expected to passthrough migrated routes?
+ * Compatibility helper for older code/tests that asked whether migrated
+ * routes should pass through to the Postgres backend.
  */
-export function isRealApiMode(
-  value: string | undefined = RAW_API_MODE
-): boolean {
-  return value === "real";
+export function isRealApiMode(_value?: string): boolean {
+  return false;
 }
