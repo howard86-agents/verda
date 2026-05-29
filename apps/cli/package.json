@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "gen:ai-articles": "bun run src/gen-ai-articles.ts",
     "gen:images": "bun run src/gen-images.ts",
     "review:images": "bun run src/review-images.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@verda/data": "*",
+    "@verda/database": "*",
     "sharp": "^0.34.1"
   },
   "devDependencies": {
