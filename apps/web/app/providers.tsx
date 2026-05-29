@@ -1,7 +1,6 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { SessionProvider } from "next-auth/react";
 import {
   createContext,
   useCallback,
@@ -90,13 +89,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeContext.Provider value={value}>
       <QueryClientProvider client={queryClient}>
-        <SessionProvider>
-          <CmsAuthProvider>
-            <RewardToastProvider>
-              <GA4Provider>{children}</GA4Provider>
-            </RewardToastProvider>
-          </CmsAuthProvider>
-        </SessionProvider>
+        <CmsAuthProvider>
+          <RewardToastProvider>
+            <GA4Provider>{children}</GA4Provider>
+          </RewardToastProvider>
+        </CmsAuthProvider>
       </QueryClientProvider>
     </ThemeContext.Provider>
   );

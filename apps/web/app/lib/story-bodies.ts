@@ -725,4 +725,255 @@ export const STORY_BODIES: Record<string, StoryBodyDoc> = {
       "Most evenings I do not need the bad-day shelf. But the nights I do, the porridge is what saves me. Slow rice. Plenty of water. A few small toppings. A little kindness from the day before, finally cashed in."
     )
   ),
+
+  s25: doc(
+    h2("The list that can change its mind"),
+    p(
+      "A rainy week asks different things from the kitchen. It asks for food that can become soup if the afternoon goes cold, toast if nobody is hungry at the same time, and a bowl if there is leftover rice waiting under a cloth. My market list for those weeks is deliberately small: mushrooms, greens, citrus, eggs, tofu, one root vegetable, and bread that can survive two days on the counter."
+    ),
+    p(
+      "The point is not austerity. The point is optionality. Mushrooms can deepen broth or sit on toast with butter. Greens can wilt into noodles, become a salad, or fold into eggs. Citrus brightens the brown meals that rainy weeks tend to produce. Tofu is a quiet protein that does not demand a plan. Bread catches everything."
+    ),
+    p(
+      "I write the list on paper because paper lets me negotiate at the stall. If the greens are tired, I buy cabbage. If the mushrooms are expensive, I buy onions and a packet of dried shiitake. If the bread is gone, I buy rice crackers and stop pretending the week needs toast."
+    ),
+    pullQuote(
+      "A good rainy-week list is not a promise to cook. It is a set of exits from not cooking."
+    ),
+    h2("Seven ingredients, many dinners"),
+    p(
+      "The first dinner is usually soup: mushrooms browned in a pot, the root vegetable diced small, water, salt, a strip of kombu if one is nearby. Greens at the end, tofu in cubes, citrus squeezed into the bowl. The second dinner is toast: mushrooms again, or greens with egg, or tofu mashed with sesame and lemon. The third is whatever remains over rice."
+    ),
+    p(
+      "By the fourth day the list has become less a plan than a vocabulary. I know what the week can say. It can say broth. It can say crisp toast. It can say soft egg. It can say enough. That is the real service of a market list in rain: not inspiration, but reduced friction."
+    ),
+    p(
+      "When the weather clears, I usually still have one lemon, half a cabbage, and two eggs. That is not failure. That is Friday's lunch already introducing itself."
+    )
+  ),
+  s26: doc(
+    h2("Clear the surface, not the self"),
+    p(
+      "At 1:47 most afternoons my desk looks like a weather event. Receipts have drifted under the notebook. A mug has gone cold. Two pens, neither the pen I want, are aligned at a diagonal that suggests urgency without producing any work. For years I treated this as evidence that I needed a new system. Now I set a five-minute timer."
+    ),
+    p(
+      "The reset is intentionally too small to become a project. Cups to the sink. Receipts to the shallow bowl by the door. Closed laptop lifted once so the crumbs can be brushed away. Notebook opened to the next clean page. One pen placed horizontally at the top, like a rail."
+    ),
+    p(
+      "That is all. I do not sort the drawer. I do not answer the message I found under the notebook. I do not reimagine my working life. The practice works because it refuses transformation and offers only a usable surface."
+    ),
+    h2("The afternoon needs a landing"),
+    p(
+      "Morning work can survive clutter because the day is still widening. Afternoon work needs a landing. The body is a little tired. The eyes are less generous. Every unnecessary object asks a tiny question, and by three o'clock I am poor in answers."
+    ),
+    p(
+      "A clear desk does not make me disciplined. It makes starting less embarrassing. The blank square in front of the keyboard says: put the next thing here. The cold mug, once removed, stops narrating the morning. The notebook, opened cleanly, stops being an archive and becomes a place."
+    ),
+    pullQuote(
+      "A reset is not a verdict on the morning. It is a small kindness to the next hour."
+    ),
+    p(
+      "Some days the desk is messy again by four. That is fine. The reset is not a state to maintain. It is a hinge. The afternoon turns more easily when the surface has been given five minutes of mercy."
+    )
+  ),
+  s27: doc(
+    h2("Movement between boiling and draining"),
+    p(
+      "The smallest room in our apartment is the kitchen, which is also where I remember my body most often. The kettle takes four minutes. Pasta water takes longer. Rice reheats in the pan while I stand with one hip against the counter, scrolling with a posture that would worry a physiotherapist."
+    ),
+    p(
+      "So I made a kitchen rule: if I am waiting for heat, I move. Not exercise, exactly. Nothing that requires clothes or shoes or a mat. Just movements that fit between the sink and the stove."
+    ),
+    h2("Three useful shapes"),
+    p(
+      "First, the counter calf raise. Hands on the counter, heels up, heels down, twenty times while the kettle thinks about boiling. It is plain and faintly ridiculous and very effective. Second, the doorway shoulder opener: forearm against the frame, gentle turn away, three breaths each side. Third, the sink fold: hands on the sink edge, hips back, spine long, a stretch for the back of the legs that also lets you inspect whether the sink needs cleaning."
+    ),
+    p(
+      "The trick is to attach each movement to a kitchen sound. Kettle click: calves. Oven beep: shoulders. Rice cooker song: sink fold. The sound becomes the teacher, which is useful because I am not reliable as my own teacher at 6:30pm."
+    ),
+    pullQuote(
+      "The movement that survives is the movement that does not require becoming another person first."
+    ),
+    p(
+      "None of this replaces a walk or a swim or the kind of strength training people with better schedules recommend. It is not meant to. It is the movement that fits where the day already has a seam. Four minutes of boiling water. Thirty seconds before draining noodles. The small pause after washing a knife."
+    ),
+    p(
+      "A kitchen can make you stiff if you only stand in it. It can also remind you, several times a day, that the body is present and available. The kettle is already on. You may as well rise onto your toes."
+    )
+  ),
+  s28: doc(
+    h2("Ten cells of spring"),
+    p(
+      "The seed tray is black plastic, the unromantic kind with ten cells and a clear lid that fogs when the sun hits it. I filled it on a cold morning when the calendar said spring and the street said otherwise. Outside, the trees were still deciding. Inside, ten small squares of soil waited on the windowsill."
+    ),
+    p(
+      "I planted basil, shiso, calendula, and two optimistic cherry tomato seeds. This was not a sensible balcony plan. It was a morale plan. I wanted spring in a form I could water."
+    ),
+    p(
+      "For four days nothing happened. This is the part of seed starting that always feels personal. You have done the work, labeled the cells, misted the soil, and the tray gives back only dirt. Then, on the fifth morning, one green hook appeared in the shiso cell, bent over like someone entering a low room."
+    ),
+    h2("The discipline of not helping"),
+    p(
+      "Seedlings do not want enthusiasm. They want light, moisture, and restraint. I am worst at the third. I want to move them, turn them, uncover them, encourage them. The tray has taught me to do less with more regularity: mist lightly, rotate once, leave the lid cracked, wait."
+    ),
+    p(
+      "By the second week the windowsill had become a small classroom. Basil leans dramatically toward light. Calendula arrives sturdy and cheerful. Tomatoes look fragile until suddenly they do not. Shiso, the slowest, seems to resent being observed."
+    ),
+    pullQuote(
+      "Before the garden is beautiful, it is legible: ten cells, ten chances to notice what care actually means."
+    ),
+    p(
+      "Only four seedlings may make it to the balcony. That is enough. The tray has already done the work I needed most. It made the season visible before the season was confident. It gave me a daily reason to look closely, and a daily reason to stop touching things that are already growing."
+    )
+  ),
+  s29: doc(
+    h2("The bowl after errands"),
+    p(
+      "Market days end with two kinds of hunger: the ordinary kind, and the kind produced by carrying bags while imagining ten possible dinners. The second hunger is dangerous. It makes you buy too much and cook too ambitiously. My answer is brothy noodles."
+    ),
+    p(
+      "The bowl begins before unpacking. Put water on. Add whatever can make it taste like itself quickly: kombu, a spoon of miso later, dried mushrooms, a splash of soy, a leftover chicken bone if the week has been that kind of week. While the water heats, wash the greens you bought because they looked alive."
+    ),
+    h2("One fragrant thing"),
+    p(
+      "Every market bowl gets one fragrant thing, the item that made you stop. Fresh coriander. Garlic chives. A mushroom with a name you forgot. A piece of ginger snapped from a larger hand. The fragrant thing is not garnish; it is the reason the bowl belongs to today rather than every other noodle dinner."
+    ),
+    p(
+      "Noodles cook separately if they are starchy, directly in the broth if they are polite. Greens go in last. Tofu, egg, or sliced leftover chicken can join if needed. The bowl should be generous but not crowded. Market food is already full of voices; dinner needs editing."
+    ),
+    pullQuote(
+      "The best post-market recipe is a bowl flexible enough to absorb enthusiasm without becoming a project."
+    ),
+    p(
+      "I eat it before putting everything away. This sounds backwards, but it saves the evening. Fed, I can wash herbs, wrap greens, move mushrooms into paper, and admit which purchase was purely emotional. Hungry, I make bad storage decisions and call them rustic."
+    ),
+    p(
+      "Brothy noodles are less a recipe than a pause between abundance and responsibility. The bags are still on the floor. The herbs smell like rain. Dinner is already happening."
+    )
+  ),
+  s30: doc(
+    h2("Borrowing as weather"),
+    p(
+      "My library card is the most seasonal object in my wallet. In winter it brings home thick novels and books about soup. In spring it brings essays, garden manuals, and one slim book of poems I renew twice before admitting I am not reading it. In summer it brings mysteries because heat reduces my tolerance for seriousness."
+    ),
+    p(
+      "I used to treat the library like a challenge: borrow the maximum, finish everything, become the person implied by the stack. This was exhausting and produced late fees. Now I borrow less and return sooner. Three books is usually right. One for attention, one for appetite, one wild card from a shelf I did not plan to visit."
+    ),
+    h2("Let the public shelf choose"),
+    p(
+      "The wild card is the important part. A library is one of the few places where browsing is still genuinely public. The shelf has been touched by other hands, constrained by budgets, rearranged by staff, thinned by strangers who got there first. You cannot optimize it completely. This is its gift."
+    ),
+    p(
+      "Once a month I let the shelf choose part of my month. I pick a section and take the book that stops me for reasons I cannot defend. A cover, a title, a sentence on page forty-two. The practice has given me a mushroom guide, a biography of a ceramicist, and a book about urban rivers that changed how I walk to the station."
+    ),
+    pullQuote(
+      "A library card is not only access to books. It is access to a less private version of curiosity."
+    ),
+    p(
+      "Returning books matters too. The return slot is a small discipline in release. The books go back before they become furniture, before they become proof of a self I am failing to become. Someone else gets them. I get an emptier bag and another chance to browse badly."
+    ),
+    p(
+      "The card is worn at one corner now. I like that. It has spent years teaching me that reading can be seasonal, borrowed, unfinished, and still completely real."
+    )
+  ),
+  s31: doc(
+    h2("Four floors, no announcement"),
+    p(
+      "The stairs in our building are not beautiful. Concrete, metal rail, a window on the second landing that looks directly into a brick wall. They smell faintly of dust and someone's dinner. For a long time I used them only when the elevator was broken. Then the elevator broke for two weeks and the stairs became ordinary."
+    ),
+    p(
+      "What surprised me was not that climbing four floors felt like exertion. Of course it did. What surprised me was how quickly exertion became useful rather than symbolic. I was not working out. I was getting home with groceries. The body understood the difference."
+    ),
+    h2("Useful effort"),
+    p(
+      "A workout asks to be counted. Reps, minutes, heart rate, rings closed. Stairs ask only to be climbed if you want what is upstairs. This makes them oddly peaceful. The effort has a destination outside the self."
+    ),
+    p(
+      "I started taking the stairs once a day, then whenever I was not carrying anything absurd, then even with one bag of groceries if the bag had handles. I do not do it every time. Some days I take the elevator because I am tired or late or simply unwilling. The practice survives because it is not a vow."
+    ),
+    pullQuote(
+      "The body likes useful effort. It likes carrying something somewhere for a reason."
+    ),
+    p(
+      "The stairs have changed how I think about movement. I need fewer declarations. More bags carried home. More errands walked. More floors climbed without converting the act into identity. Not everything that strengthens the body has to be named as exercise before it counts."
+    ),
+    p(
+      "At the fourth-floor landing I pause, partly because I need to and partly because the small window there catches evening light. Then I unlock the door, put the groceries down, and feel the work disappear into the day where it belongs."
+    )
+  ),
+  s32: doc(
+    h2("Plants with neighbors"),
+    p(
+      "Companion planting always sounded to me like folklore wearing a gardening hat. Basil loves tomatoes. Marigolds protect everything. Beans make mysterious agreements underground. Some of this is science, some of it is tradition, and some of it is gardeners noticing patterns for longer than I have been alive."
+    ),
+    p(
+      "On a balcony, the stakes are smaller and the lessons arrive faster. You have three planters, not a field. If the basil shades the thyme, you will know by Tuesday. If the marigolds attract hoverflies, you will see them at breakfast."
+    ),
+    h2("A practical map"),
+    p(
+      "My impatient version is simple. Tall things at the back. Thirsty things with thirsty things. Dry-footed herbs in their own pot no matter how charming they look beside tomatoes. Flowers near greens because pollinators and humans both need encouragement. Mint alone, always."
+    ),
+    p(
+      "This year one long planter holds cherry tomatoes, basil, and two marigolds. Another holds lettuce, scallions, and calendula. Rosemary sits apart in a clay pot pretending not to need anyone. Mint occupies its wide container like a tenant with legal protections."
+    ),
+    pullQuote(
+      "Good companion planting is less about romance than about preventing avoidable drama."
+    ),
+    p(
+      "The balcony now looks more like a small neighborhood than a display. Some plants help each other. Some merely tolerate proximity. Some require boundaries. The lesson is not subtle, and I am trying not to overuse it."
+    ),
+    p(
+      "If you are impatient, begin with compatibility you can see: sun, water, height, root room. The invisible agreements may come later. The visible ones will keep the planter alive long enough for you to learn."
+    )
+  ),
+  s33: doc(
+    h2("Future dinner, already cooked"),
+    p(
+      "A pot of beans is too much dinner for one night and exactly enough care for four future nights. This is the logic that finally made me cook beans regularly. Not romance, not thrift, not the moral superiority of dried legumes. Relief."
+    ),
+    p(
+      "I cook them on a morning when I am home anyway. Soaked beans if I remembered, unsoaked if I did not. Onion, bay, salt later than I want to add it, enough water to make broth worth saving. The pot simmers while other things happen. Laundry. Email. A walk to buy oranges."
+    ),
+    h2("Pack the broth too"),
+    p(
+      "The important part is freezing the beans with their broth. Dry beans in a container become homework. Brothy beans become dinner. I ladle them into small containers, enough for one meal each, label them with tape, and stack them where I will see them before ordering takeout."
+    ),
+    p(
+      "Future uses are deliberately plain: beans over toast with oil and lemon; beans with greens and pasta; beans mashed into a quick dip; beans added to soup that was otherwise only vegetables apologizing to water. The broth carries the work forward."
+    ),
+    pullQuote(
+      "The freezer is most generous when it stores not ingredients, but decisions already made."
+    ),
+    p(
+      "There is a particular relief in finding cooked beans on a night that has gone sideways. Someone in the past — me, but kinder — has already done the long part. Present me only has to warm, season, and choose bread or rice."
+    ),
+    p(
+      "This is the kind of batch cooking I trust: not a grid of identical meals, but useful beginnings. Four small containers. Four future dinners that can still become themselves."
+    )
+  ),
+  s34: doc(
+    h2("The hour nobody scheduled"),
+    p(
+      "Our building has a shared courtyard with a persimmon tree, six bicycles, three mismatched watering cans, and more pots than anyone officially admits to owning. In the evening, around the time the windows turn gold, people appear with small tasks. Nobody has arranged this. It happens anyway."
+    ),
+    p(
+      "One neighbor waters the ferns by the stairwell because the tenant who planted them moved away. Another deadheads marigolds in a pot technically belonging to the ground-floor cafe. Children pick up fallen leaves and sort them by size until someone calls them in for dinner."
+    ),
+    h2("Shared care, low ceremony"),
+    p(
+      "The courtyard works because the care is visible and undramatic. A plant wilts; someone waters it. A saucer fills after rain; someone tips it out. The broom appears after a windy day. No committee forms. No one writes a policy for the mint."
+    ),
+    p(
+      "This informality has limits, of course. Shared spaces can become nobody's responsibility as easily as everyone's. But evening light helps. It makes neglect visible and care attractive. You step outside to shake a rug and end up watering basil because the can is already there."
+    ),
+    pullQuote(
+      "A shared courtyard is a place where neighborliness can stay practical enough to survive."
+    ),
+    p(
+      "I have learned more about the building from these ten-minute overlaps than from any meeting. Who works late. Who knows how to prune. Who saves rainwater in a bucket. Who prefers silence and still waters the fern."
+    ),
+    p(
+      "By dark the courtyard is ordinary again: bicycles, pots, a damp patch near the drain. But for one hour it becomes a small commons, lit from the side, teaching the building how to look after something together without making a performance of it."
+    )
+  ),
 };

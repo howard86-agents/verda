@@ -13,37 +13,39 @@ bun install
 
 ## Backend
 
-The public stories read path is migrating to a real Postgres backend behind the `NEXT_PUBLIC_API_MODE` flag (issue #126). The rest of the surface stays on the in-browser Dexie + MSW store while later issues land their own slices.
+Production is intentionally browser-only: the Next.js app boots MSW in the client and every app API request is served from the in-browser Dexie store. A stale `NEXT_PUBLIC_API_MODE=real` env value is ignored so production cannot bypass MSW and hit the Postgres-backed Route Handlers.
 
 ```sh
-cp .env.example .env             # DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_API_MODE
-docker compose up -d             # local Postgres 15 on :5432
-bun run db:migrate:dev           # apply Prisma migrations
-bun run db:seed                  # 5 sections + 20 brand stories
+cp .env.example .env             # optional local-only settings
 bun run dev                      # web + cli + database watchers
 ```
 
-`docker-compose` (the v1 binary) and `docker compose` (the Compose v2 plugin) both work; pick whichever your machine has.
+The Prisma/Postgres package is still present for historical route-handler and migration work, but it is not required for the production client-side MSW path.
 
 ### `NEXT_PUBLIC_API_MODE`
 
 | Value | Behaviour |
 |---|---|
-| `mock` (default; also when unset or unrecognised) | MSW intercepts every route, including the migrated stories endpoints. No DB needed. |
-| `real` | MSW drops the migrated handlers, the request bypasses the worker, and the real Next.js Route Handlers under `apps/web/app/api/stories/...` serve from Postgres. |
+| unset / `mock` / any value, including stale `real` | MSW intercepts every app API route. No database is required for the production app. |
 
-The flag must be set at build time so Next can inline it into the client bundle. Per-route migration decisions live in the `migratedStoriesHandlers` array in `apps/web/app/mocks/handlers.ts` — each future migrated route appends to that list.
+The compatibility flag is retained only to avoid breaking stale Vercel/local env configuration; it no longer enables real-backend passthrough.
 
-### Connection-URL shape
+### Optional local Postgres utilities
 
-The two-URL Supavisor shape is mirrored locally so production cutover is config-only:
+Only use these commands when deliberately exercising the historical Prisma-backed Route Handlers or migrations:
 
-| Var | Local | Production |
-|---|---|---|
-| `DATABASE_URL` | docker-compose Postgres on `:5432` (with `pgbouncer=true`) | Supavisor pooler on `:6543` |
-| `DIRECT_URL` | docker-compose Postgres on `:5432` | direct Postgres on `:5432` |
+```sh
+docker compose up -d
+bun run db:migrate:dev
+bun run db:seed
+```
 
-The runtime client (`packages/database/src/client.ts`) uses `DATABASE_URL`; the Prisma CLI uses `DIRECT_URL` for migrations.
+`docker-compose` (the v1 binary) and `docker compose` (the Compose v2 plugin) both work; pick whichever your machine has.
+
+| Var | Local utility use |
+|---|---|
+| `DATABASE_URL` | Runtime URL for historical DB-backed Route Handler tests/scripts. |
+| `DIRECT_URL` | Direct URL Prisma uses for migrations / `db push`. |
 
 ## Quality gates
 

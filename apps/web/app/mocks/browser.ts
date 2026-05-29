@@ -1,29 +1,8 @@
 import { setupWorker } from "msw/browser";
-import { isRealApiMode } from "../lib/api-mode";
-import {
-  handlers,
-  migratedGrowthHandlers,
-  migratedReaderProfileHandlers,
-  migratedSearchHandlers,
-  migratedStoriesHandlers,
-  migratedSubmissionHandlers,
-} from "./handlers";
+import { handlers } from "./handlers";
 
-// When `NEXT_PUBLIC_API_MODE=real`, drop the handlers for routes that
-// the real Postgres-backed backend now serves (issue #126, #128, #132,
-// #133, #139). The worker still starts so non-migrated routes (CMS,
-// comments, …) keep using the in-browser Dexie store; the migrated
-// routes fall through to the real Next.js Route Handlers via
-// `onUnhandledRequest: "bypass"`.
-const migratedHandlers = [
-  ...migratedStoriesHandlers,
-  ...migratedSearchHandlers,
-  ...migratedReaderProfileHandlers,
-  ...migratedGrowthHandlers,
-  ...migratedSubmissionHandlers,
-];
-const activeHandlers = isRealApiMode()
-  ? handlers.filter((handler) => !migratedHandlers.includes(handler))
-  : handlers;
-
-export const worker = setupWorker(...activeHandlers);
+// Production intentionally uses the same browser-only Dexie + MSW API
+// surface as local development and tests. Keep every handler active so
+// stale `NEXT_PUBLIC_API_MODE=real` env values cannot bypass MSW and hit
+// the Postgres-backed Route Handlers.
+export const worker = setupWorker(...handlers);
