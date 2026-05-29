@@ -15,11 +15,9 @@ test("/readers/submit redirects logged-out users to sign in", async ({
 test("a signed-in member sees the submission form on /readers/submit", async ({
   page,
 }) => {
-  // Sign in via the dev-tools Login button (which now calls
-  // `signIn("credentials", { email: MIRA_EMAIL })` via Auth.js v5
-  // — issue #127). The legacy `localStorage.setItem("verda.auth", "1")`
-  // shortcut no longer works because the auth surface reads its
-  // session from a JWT cookie set by `/api/auth/callback/credentials`.
+  // Sign in via the dev-tools Login button. The auth surface is now
+  // browser-only again: it stores the seeded demo member in localStorage
+  // so production remains pure client-side MSW/Dexie.
   await page.goto("/");
   await page.waitForTimeout(3000);
   await page.getByRole("button", { name: LOGIN_DEV_RE }).click();
